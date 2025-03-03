@@ -1,0 +1,104 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:22:00.874541",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            0,
+            12,
+            18,
+            20,
+            6,
+            14,
+            15,
+            10
+        ],
+        "resources_allocated": {
+            "explosives": 1,
+            "ammo": 1,
+            "radiation_suits": 1
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 299.31046101134405,
+        "path_length": 116.29192521662152,
+        "resources": {
+            "initial": {
+                "explosives": 1,
+                "ammo": 1,
+                "radiation_suits": 1
+            },
+            "remaining": {
+                "explosives": 0,
+                "ammo": 1,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 0"
+            ],
+            [
+                1,
+                "Arrived at node 0"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Path blocked to node 18 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 18"
+            ],
+            [
+                2,
+                "Arrived at node 12"
+            ],
+            [
+                2,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                2,
+                "TEAM DIED - Ran out of radiation suits"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 1,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 1,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "radiation_suits": {
+                "allocated": 1,
+                "used": 1,
+                "needed": 2,
+                "effective_uses": 1
+            }
+        }
+    }
+}

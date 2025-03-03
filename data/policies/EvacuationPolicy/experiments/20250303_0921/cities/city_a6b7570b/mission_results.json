@@ -1,0 +1,176 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:54.880633",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            23,
+            0,
+            15,
+            65,
+            18,
+            16,
+            66,
+            27
+        ],
+        "resources_allocated": {
+            "explosives": 3,
+            "ammo": 3,
+            "radiation_suits": 3
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 380.0677575543259,
+        "path_length": 75.38314495279613,
+        "resources": {
+            "initial": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            },
+            "remaining": {
+                "explosives": 1,
+                "ammo": 1,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 23"
+            ],
+            [
+                1,
+                "Arrived at node 23"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Moving to node 15"
+            ],
+            [
+                2,
+                "Arrived at node 0"
+            ],
+            [
+                2,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                2,
+                "Used radiation suit successfully"
+            ],
+            [
+                2,
+                "Moving to node 65"
+            ],
+            [
+                3,
+                "Arrived at node 15"
+            ],
+            [
+                3,
+                "Path blocked to node 18 (blockage detected)"
+            ],
+            [
+                3,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                3,
+                "Moving to node 18"
+            ],
+            [
+                4,
+                "Arrived at node 65"
+            ],
+            [
+                4,
+                "Zombie horde encountered (level: 0.74)"
+            ],
+            [
+                4,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                4,
+                "Path blocked to node 16 (blockage detected)"
+            ],
+            [
+                4,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                4,
+                "Moving to node 16"
+            ],
+            [
+                5,
+                "Arrived at node 18"
+            ],
+            [
+                5,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                5,
+                "Used radiation suit successfully"
+            ],
+            [
+                5,
+                "Zombie horde encountered (level: 0.58)"
+            ],
+            [
+                5,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                5,
+                "Moving to node 66"
+            ],
+            [
+                6,
+                "Arrived at node 16"
+            ],
+            [
+                6,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                6,
+                "TEAM DIED - Ran out of radiation suits"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 4,
+                "effective_uses": 3
+            }
+        }
+    }
+}

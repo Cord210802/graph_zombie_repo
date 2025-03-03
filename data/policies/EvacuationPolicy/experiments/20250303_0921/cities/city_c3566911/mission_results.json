@@ -1,0 +1,106 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:57.946851",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            64,
+            11
+        ],
+        "resources_allocated": {
+            "explosives": 3,
+            "ammo": 3,
+            "radiation_suits": 3
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 11.225383614865805,
+        "path_length": 3.519191214686107,
+        "resources": {
+            "initial": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            },
+            "remaining": {
+                "explosives": 3,
+                "ammo": 1,
+                "radiation_suits": 1
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 64"
+            ],
+            [
+                1,
+                "Arrived at node 64"
+            ],
+            [
+                1,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.70)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Arrived at node 11"
+            ],
+            [
+                2,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                2,
+                "Used radiation suit successfully"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.71)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Successfully reached extraction point at node 11"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            }
+        }
+    }
+}

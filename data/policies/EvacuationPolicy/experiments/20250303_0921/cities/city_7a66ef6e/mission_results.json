@@ -1,0 +1,115 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:22:00.678376",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            10,
+            23,
+            32
+        ],
+        "resources_allocated": {
+            "explosives": 4,
+            "ammo": 4,
+            "radiation_suits": 4
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 89.26145250985438,
+        "path_length": 28.128383076163427,
+        "resources": {
+            "initial": {
+                "explosives": 4,
+                "ammo": 4,
+                "radiation_suits": 4
+            },
+            "remaining": {
+                "explosives": 3,
+                "ammo": 4,
+                "radiation_suits": 1
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 10"
+            ],
+            [
+                1,
+                "Arrived at node 10"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Path blocked to node 32 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 32"
+            ],
+            [
+                2,
+                "Arrived at node 23"
+            ],
+            [
+                2,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                2,
+                "Used radiation suit successfully"
+            ],
+            [
+                3,
+                "Arrived at node 32"
+            ],
+            [
+                3,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                3,
+                "Used radiation suit successfully"
+            ],
+            [
+                3,
+                "Successfully reached extraction point at node 32"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 4,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 4,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "radiation_suits": {
+                "allocated": 4,
+                "used": 3,
+                "needed": 3,
+                "effective_uses": 3
+            }
+        }
+    }
+}

@@ -1,0 +1,77 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:57.330834",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            42
+        ],
+        "resources_allocated": {
+            "explosives": 5,
+            "ammo": 5,
+            "radiation_suits": 5
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 0.0,
+        "path_length": 0,
+        "resources": {
+            "initial": {
+                "explosives": 5,
+                "ammo": 5,
+                "radiation_suits": 5
+            },
+            "remaining": {
+                "explosives": 0,
+                "ammo": 0,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 42"
+            ],
+            [
+                1,
+                "Arrived at node 42"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.81)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                1,
+                "FAILED - Path does not reach extraction point ended at node 42"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "ammo": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

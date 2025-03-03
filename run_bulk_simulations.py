@@ -1,12 +1,13 @@
 # Global configuration for visualization options
-SKIP_CITY_ANALYSIS = False
+print("Running bulk simulations...")
+SKIP_CITY_ANALYSIS = True
 POLICY_NAME =  "EvacuationPolicy"
 CONFIG = {
         'node_range': {
             'min': 20,
-            'max': 50
+            'max': 70
         },
-        'n_runs': 10,  # Total number of cities to simulate
+        'n_runs': 500,  # Total number of cities to simulate
         'base_seed': 7354681  # For reproducibility
     }
 

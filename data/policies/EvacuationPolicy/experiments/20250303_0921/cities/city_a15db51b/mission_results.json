@@ -1,0 +1,99 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:58.654000",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            0,
+            43,
+            1
+        ],
+        "resources_allocated": {
+            "explosives": 5,
+            "ammo": 5,
+            "radiation_suits": 5
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 35.23928269762317,
+        "path_length": 16.888063353928413,
+        "resources": {
+            "initial": {
+                "explosives": 5,
+                "ammo": 5,
+                "radiation_suits": 5
+            },
+            "remaining": {
+                "explosives": 4,
+                "ammo": 4,
+                "radiation_suits": 5
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 0"
+            ],
+            [
+                1,
+                "Arrived at node 0"
+            ],
+            [
+                1,
+                "Path blocked to node 1 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 1"
+            ],
+            [
+                2,
+                "Arrived at node 43"
+            ],
+            [
+                3,
+                "Arrived at node 1"
+            ],
+            [
+                3,
+                "Zombie horde encountered (level: 0.51)"
+            ],
+            [
+                3,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                3,
+                "Successfully reached extraction point at node 1"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 5,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 5,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 5,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

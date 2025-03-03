@@ -1,0 +1,161 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:56.867689",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            21,
+            0,
+            9,
+            20,
+            25
+        ],
+        "resources_allocated": {
+            "explosives": 3,
+            "ammo": 3,
+            "radiation_suits": 3
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 318.8019763183324,
+        "path_length": 62.8207152680836,
+        "resources": {
+            "initial": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            },
+            "remaining": {
+                "explosives": 2,
+                "ammo": 0,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 21"
+            ],
+            [
+                1,
+                "Arrived at node 21"
+            ],
+            [
+                1,
+                "Path blocked to node 9 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 9"
+            ],
+            [
+                2,
+                "Arrived at node 0"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.52)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Moving to node 20"
+            ],
+            [
+                3,
+                "Arrived at node 9"
+            ],
+            [
+                3,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                3,
+                "Used radiation suit successfully"
+            ],
+            [
+                3,
+                "Zombie horde encountered (level: 0.68)"
+            ],
+            [
+                3,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                3,
+                "Moving to node 25"
+            ],
+            [
+                4,
+                "Arrived at node 20"
+            ],
+            [
+                4,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                4,
+                "Used radiation suit successfully"
+            ],
+            [
+                4,
+                "Zombie horde encountered (level: 0.46)"
+            ],
+            [
+                4,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                5,
+                "Arrived at node 25"
+            ],
+            [
+                5,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                5,
+                "Used radiation suit successfully"
+            ],
+            [
+                5,
+                "Zombie horde encountered (level: 0.63)"
+            ],
+            [
+                5,
+                "TEAM DIED - Ran out of ammo"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 4,
+                "effective_uses": 3
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 3,
+                "effective_uses": 3
+            }
+        }
+    }
+}

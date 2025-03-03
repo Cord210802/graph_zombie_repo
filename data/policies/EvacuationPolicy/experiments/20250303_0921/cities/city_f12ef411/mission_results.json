@@ -1,0 +1,188 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:57.551142",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            6,
+            15,
+            22,
+            33,
+            3,
+            39,
+            41,
+            20,
+            46,
+            0,
+            25,
+            42
+        ],
+        "resources_allocated": {
+            "explosives": 5,
+            "ammo": 5,
+            "radiation_suits": 5
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 846.8624458899105,
+        "path_length": 165.764636116881,
+        "resources": {
+            "initial": {
+                "explosives": 5,
+                "ammo": 5,
+                "radiation_suits": 5
+            },
+            "remaining": {
+                "explosives": 3,
+                "ammo": 0,
+                "radiation_suits": 5
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 6"
+            ],
+            [
+                1,
+                "Arrived at node 6"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.63)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                1,
+                "Moving to node 22"
+            ],
+            [
+                2,
+                "Arrived at node 15"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.87)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Moving to node 33"
+            ],
+            [
+                3,
+                "Arrived at node 22"
+            ],
+            [
+                3,
+                "Zombie horde encountered (level: 0.70)"
+            ],
+            [
+                3,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                3,
+                "Path blocked to node 3 (blockage detected)"
+            ],
+            [
+                3,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                3,
+                "Moving to node 3"
+            ],
+            [
+                4,
+                "Arrived at node 33"
+            ],
+            [
+                4,
+                "Moving to node 39"
+            ],
+            [
+                5,
+                "Arrived at node 3"
+            ],
+            [
+                5,
+                "Zombie horde encountered (level: 1.00)"
+            ],
+            [
+                5,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                5,
+                "Moving to node 41"
+            ],
+            [
+                6,
+                "Arrived at node 39"
+            ],
+            [
+                6,
+                "Zombie horde encountered (level: 1.00)"
+            ],
+            [
+                6,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                6,
+                "Path blocked to node 20 (blockage detected)"
+            ],
+            [
+                6,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                6,
+                "Moving to node 20"
+            ],
+            [
+                7,
+                "Arrived at node 41"
+            ],
+            [
+                7,
+                "Zombie horde encountered (level: 1.00)"
+            ],
+            [
+                7,
+                "TEAM DIED - Ran out of ammo"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 5,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "ammo": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 6,
+                "effective_uses": 5
+            },
+            "radiation_suits": {
+                "allocated": 5,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

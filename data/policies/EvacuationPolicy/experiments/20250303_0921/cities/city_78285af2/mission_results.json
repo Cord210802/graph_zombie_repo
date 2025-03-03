@@ -1,0 +1,166 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:59.703456",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            33,
+            17,
+            6,
+            5,
+            30,
+            8
+        ],
+        "resources_allocated": {
+            "explosives": 3,
+            "ammo": 3,
+            "radiation_suits": 3
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 334.9062341771889,
+        "path_length": 66.12942746107802,
+        "resources": {
+            "initial": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            },
+            "remaining": {
+                "explosives": 0,
+                "ammo": 2,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 33"
+            ],
+            [
+                1,
+                "Arrived at node 33"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.73)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                1,
+                "Path blocked to node 6 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 6"
+            ],
+            [
+                2,
+                "Arrived at node 17"
+            ],
+            [
+                2,
+                "Path blocked to node 5 (blockage detected)"
+            ],
+            [
+                2,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                2,
+                "Moving to node 5"
+            ],
+            [
+                3,
+                "Arrived at node 6"
+            ],
+            [
+                3,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                3,
+                "Used radiation suit successfully"
+            ],
+            [
+                3,
+                "Moving to node 30"
+            ],
+            [
+                4,
+                "Arrived at node 5"
+            ],
+            [
+                4,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                4,
+                "Used radiation suit successfully"
+            ],
+            [
+                4,
+                "Path blocked to node 8 (blockage detected)"
+            ],
+            [
+                4,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                4,
+                "Moving to node 8"
+            ],
+            [
+                5,
+                "Arrived at node 30"
+            ],
+            [
+                5,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                5,
+                "TEAM DIED - Ran out of radiation suits"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 3,
+                "effective_uses": 3
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 4,
+                "effective_uses": 3
+            }
+        }
+    }
+}

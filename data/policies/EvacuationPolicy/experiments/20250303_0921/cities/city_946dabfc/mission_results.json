@@ -1,0 +1,137 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:54.697882",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            2,
+            20,
+            18,
+            12,
+            19,
+            3,
+            8,
+            22,
+            6
+        ],
+        "resources_allocated": {
+            "explosives": 2,
+            "ammo": 2,
+            "radiation_suits": 2
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 596.7420785019139,
+        "path_length": 143.1745460282471,
+        "resources": {
+            "initial": {
+                "explosives": 2,
+                "ammo": 2,
+                "radiation_suits": 2
+            },
+            "remaining": {
+                "explosives": 0,
+                "ammo": 1,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 2"
+            ],
+            [
+                1,
+                "Arrived at node 2"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Path blocked to node 18 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 18"
+            ],
+            [
+                2,
+                "Arrived at node 20"
+            ],
+            [
+                2,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                2,
+                "Used radiation suit successfully"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.61)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Path blocked to node 12 (blockage detected)"
+            ],
+            [
+                2,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                2,
+                "Moving to node 12"
+            ],
+            [
+                3,
+                "Arrived at node 18"
+            ],
+            [
+                3,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                3,
+                "TEAM DIED - Ran out of radiation suits"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 2,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "ammo": {
+                "allocated": 2,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 2,
+                "used": 2,
+                "needed": 3,
+                "effective_uses": 2
+            }
+        }
+    }
+}

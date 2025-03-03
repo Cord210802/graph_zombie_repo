@@ -1,0 +1,250 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:52.058417",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            43,
+            52,
+            42,
+            1,
+            24,
+            51,
+            7,
+            21,
+            38,
+            49
+        ],
+        "resources_allocated": {
+            "explosives": 5,
+            "ammo": 5,
+            "radiation_suits": 5
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 727.2084109001646,
+        "path_length": 89.15094986166372,
+        "resources": {
+            "initial": {
+                "explosives": 5,
+                "ammo": 5,
+                "radiation_suits": 5
+            },
+            "remaining": {
+                "explosives": 1,
+                "ammo": 1,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 43"
+            ],
+            [
+                1,
+                "Arrived at node 43"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.78)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                1,
+                "Path blocked to node 42 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 42"
+            ],
+            [
+                2,
+                "Arrived at node 52"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.57)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Path blocked to node 1 (blockage detected)"
+            ],
+            [
+                2,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                2,
+                "Moving to node 1"
+            ],
+            [
+                3,
+                "Arrived at node 42"
+            ],
+            [
+                3,
+                "Moving to node 24"
+            ],
+            [
+                4,
+                "Arrived at node 1"
+            ],
+            [
+                4,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                4,
+                "Used radiation suit successfully"
+            ],
+            [
+                4,
+                "Moving to node 51"
+            ],
+            [
+                5,
+                "Arrived at node 24"
+            ],
+            [
+                5,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                5,
+                "Used radiation suit successfully"
+            ],
+            [
+                5,
+                "Path blocked to node 7 (blockage detected)"
+            ],
+            [
+                5,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                5,
+                "Moving to node 7"
+            ],
+            [
+                6,
+                "Arrived at node 51"
+            ],
+            [
+                6,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                6,
+                "Used radiation suit successfully"
+            ],
+            [
+                6,
+                "Moving to node 21"
+            ],
+            [
+                7,
+                "Arrived at node 7"
+            ],
+            [
+                7,
+                "High radiation detected (level: 1.00)"
+            ],
+            [
+                7,
+                "Used radiation suit successfully"
+            ],
+            [
+                7,
+                "Zombie horde encountered (level: 0.61)"
+            ],
+            [
+                7,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                7,
+                "Path blocked to node 38 (blockage detected)"
+            ],
+            [
+                7,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                7,
+                "Moving to node 38"
+            ],
+            [
+                8,
+                "Arrived at node 21"
+            ],
+            [
+                8,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                8,
+                "Used radiation suit successfully"
+            ],
+            [
+                8,
+                "Zombie horde encountered (level: 0.61)"
+            ],
+            [
+                8,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                8,
+                "Moving to node 49"
+            ],
+            [
+                9,
+                "Arrived at node 38"
+            ],
+            [
+                9,
+                "High radiation detected (level: 0.65)"
+            ],
+            [
+                9,
+                "TEAM DIED - Ran out of radiation suits"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 5,
+                "used": 4,
+                "needed": 4,
+                "effective_uses": 4
+            },
+            "ammo": {
+                "allocated": 5,
+                "used": 4,
+                "needed": 4,
+                "effective_uses": 4
+            },
+            "radiation_suits": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 6,
+                "effective_uses": 5
+            }
+        }
+    }
+}

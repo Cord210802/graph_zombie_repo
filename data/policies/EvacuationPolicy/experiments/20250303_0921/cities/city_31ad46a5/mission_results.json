@@ -1,0 +1,116 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:51.750630",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            9,
+            23,
+            14,
+            18
+        ],
+        "resources_allocated": {
+            "explosives": 1,
+            "ammo": 1,
+            "radiation_suits": 1
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 210.62979664364872,
+        "path_length": 68.32457189767516,
+        "resources": {
+            "initial": {
+                "explosives": 1,
+                "ammo": 1,
+                "radiation_suits": 1
+            },
+            "remaining": {
+                "explosives": 0,
+                "ammo": 0,
+                "radiation_suits": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 9"
+            ],
+            [
+                1,
+                "Arrived at node 9"
+            ],
+            [
+                1,
+                "Path blocked to node 14 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 14"
+            ],
+            [
+                2,
+                "Arrived at node 23"
+            ],
+            [
+                2,
+                "Zombie horde encountered (level: 0.80)"
+            ],
+            [
+                2,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Moving to node 18"
+            ],
+            [
+                3,
+                "Arrived at node 14"
+            ],
+            [
+                3,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                3,
+                "Used radiation suit successfully"
+            ],
+            [
+                3,
+                "Zombie horde encountered (level: 0.98)"
+            ],
+            [
+                3,
+                "TEAM DIED - Ran out of ammo"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 1,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 1,
+                "used": 1,
+                "needed": 2,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 1,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            }
+        }
+    }
+}

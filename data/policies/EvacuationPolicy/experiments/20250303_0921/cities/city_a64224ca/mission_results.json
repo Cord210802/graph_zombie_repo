@@ -1,0 +1,74 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-03T09:21:50.619334",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            9,
+            2
+        ],
+        "resources_allocated": {
+            "explosives": 3,
+            "ammo": 3,
+            "radiation_suits": 3
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 7.409928594315712,
+        "path_length": 7.25771991419249,
+        "resources": {
+            "initial": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            },
+            "remaining": {
+                "explosives": 3,
+                "ammo": 3,
+                "radiation_suits": 3
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 9"
+            ],
+            [
+                1,
+                "Arrived at node 9"
+            ],
+            [
+                2,
+                "Arrived at node 2"
+            ],
+            [
+                2,
+                "Successfully reached extraction point at node 2"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}
