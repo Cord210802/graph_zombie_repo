@@ -69,7 +69,7 @@ class EvacuationPolicy:
         else:  # policy_4
             return self._policy_4(city, proxy_data, max_resources)
     
-    def _policy_1(self, city: CityGraph, max_resources: int) -> PolicyResult:
+    def _policy_1(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política 1: Estrategia básica sin uso de proxies.
         Solo utiliza información básica de nodos y aristas para tomar decisiones.
@@ -79,23 +79,49 @@ class EvacuationPolicy:
         - Solo usar información básica del grafo (nodos, aristas, pesos)
         - Implementar una estrategia válida para cualquier ciudad
         """
-        # TODO: Implementa tu solución aquí
-        target = city.extraction_nodes[0]
+        # Verificar si hay un camino a algún nodo de extracción
+        valid_paths = []
         
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
-            
+        for target in city.extraction_nodes:
+            try:
+                # Intentar encontrar el camino más corto al nodo de extracción
+                path = nx.shortest_path(city.graph, city.starting_node, target, weight='weight')
+                # Calcular la longitud real del camino (suma de pesos)
+                path_length = sum(city.graph[path[i]][path[i+1]]['weight'] for i in range(len(path)-1))
+                valid_paths.append((path, path_length))
+            except nx.NetworkXNoPath:
+                # No hay camino a este nodo de extracción
+                continue
+        
+        # Si no hay caminos válidos a ningún nodo de extracción
+        if not valid_paths:
+            # Si el grafo no es conexo para nuestros puntos de interés, devolvemos solo el nodo inicial
+            # y no asignamos recursos (conforme a la instrucción)
+            return PolicyResult([city.starting_node], {'explosives': 0, 'ammo': 0, 'radiation_suits': 0})
+        
+        # Encontrar el camino más corto entre todos los válidos
+        best_path, _ = min(valid_paths, key=lambda x: x[1])
+        
+        # Distribuir los recursos de manera equitativa (33% cada uno)
+        resources_per_type = max_resources // 3
+        
+        # Manejar casos donde max_resources no es divisible por 3
+        remaining = max_resources - (resources_per_type * 3)
+        
         resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
+            'explosives': resources_per_type,
+            'ammo': resources_per_type,
+            'radiation_suits': resources_per_type
         }
         
-        return PolicyResult(path, resources)
-    
+        # Distribuir los recursos restantes (si hay) de manera secuencial
+        # Sin preferencia específica, ya que no tenemos datos previos
+        if remaining > 0:
+            resource_types = ['explosives', 'ammo', 'radiation_suits']
+            for i in range(remaining):
+                resources[resource_types[i]] += 1
+        
+        return PolicyResult(best_path, resources)
     def _policy_2(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política que minimiza el hazard_gradient a lo largo de la ruta.
