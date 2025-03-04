@@ -98,37 +98,77 @@ class EvacuationPolicy:
     
     def _policy_2(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política 2: Estrategia usando proxies y sus descripciones.
-        Utiliza la información de los proxies basándose en sus descripciones documentadas.
+        Política que minimiza el hazard_gradient a lo largo de la ruta.
+        Primero verifica si es posible llegar a algún punto de extracción.
         
-        Esta política debe:
-        - Utilizar los proxies según sus descripciones en docs/05_guia_proxy.md
-        - NO utilizar datos de simulaciones
-        - Implementar decisiones basadas en la interpretación de los rangos documentados
+        Esta política:
+        - Verifica la conectividad del grafo
+        - Se enfoca en minimizar el hazard_gradient
+        - Distribuye recursos según la prioridad establecida
         """
-        # TODO: Implementa tu solución aquí
-        proxy_data_nodes_df = convert_node_data_to_df(proxy_data.node_data)
-        proxy_data_edges_df = convert_edge_data_to_df(proxy_data.edge_data)
+        # Verificamos si es posible llegar a alguno de los puntos de extracción
+        reachable_targets = []
+        for target in city.extraction_nodes:
+            try:
+                # Intentamos encontrar cualquier camino (sin considerar pesos)
+                path = nx.shortest_path(city.graph, city.starting_node, target)
+                reachable_targets.append(target)
+            except nx.NetworkXNoPath:
+                continue
         
-        #print(f'\n Node Data: \n {proxy_data_nodes_df}')
-        #print(f'\n Edge Data: \n {proxy_data_edges_df}')
+        # Si no podemos llegar a ningún punto de extracción, imprimimos mensaje y devolvemos camino vacío
+        if not reachable_targets:
+            return PolicyResult([city.starting_node], {
+                'radiation_suits':0,
+                'ammo':0,
+                'explosives':0
+            })
         
-        target = city.extraction_nodes[0]
+        # Creamos un grafo ponderado donde el peso es el hazard_gradient
+        hazard_graph = city.graph.copy()
         
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
+        # Asignamos pesos basados únicamente en el hazard_gradient
+        for u, v, data in hazard_graph.edges(data=True):
+            edge_key = f"{u}_{v}"
+            base_weight = data.get('weight', 1)
             
+            if edge_key in proxy_data.edge_data:
+                # Usamos el hazard_gradient como peso principal
+                hazard_value = proxy_data.edge_data[edge_key].get("hazard_gradient", 0)
+                
+                # Añadimos un pequeño valor constante para evitar pesos de cero
+                new_weight = base_weight * (1 + hazard_value * 10 + 0.01)
+                hazard_graph[u][v]['weight'] = new_weight
+        
+        # Encontramos el camino más corto (con menor hazard_gradient acumulado)
+        best_path = None
+        best_path_cost = float('inf')
+        
+        for target in reachable_targets:
+            path = nx.shortest_path(hazard_graph, city.starting_node, target, weight='weight')
+            path_cost = nx.path_weight(hazard_graph, path, weight='weight')
+            
+            if path_cost < best_path_cost:
+                best_path = path
+                best_path_cost = path_cost
+        
+        # Distribuimos recursos según la prioridad establecida
+        # Trajes de radiación (45%), munición (35%), explosivos (20%)
         resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
+            'radiation_suits': int(max_resources * 0.45),
+            'ammo': int(max_resources * 0.393),
+            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.393)
         }
         
-        return PolicyResult(path, resources)
-    
+        
+        # Ajustamos para asegurar que sumamos exactamente max_resources
+        adjustment = max_resources - sum(resources.values())
+        
+        # Si hay ajuste necesario, lo asignamos prioritariamente a trajes de radiación
+        if adjustment > 0:
+            resources['radiation_suits'] += adjustment
+        
+        return PolicyResult(best_path, resources)
     def _policy_3(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política 3: Estrategia usando datos de simulaciones previas.
