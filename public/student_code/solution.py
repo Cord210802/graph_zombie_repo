@@ -1,9 +1,542 @@
 import networkx as nx
+from typing import Dict, List, Literal, Tuple, Set
+
+from public.lib.interfaces import CityGraph, ProxyData, PolicyResult
+from public.student_code.convert_to_df import convert_edge_data_to_df, convert_node_data_to_df
+import numpy as np
+import heapq
+
+import networkx as nx
 from typing import Dict, List, Literal
 
 from public.lib.interfaces import CityGraph, ProxyData, PolicyResult
 from public.student_code.convert_to_df import convert_edge_data_to_df, convert_node_data_to_df
 
+class PathEvaluator:
+    """Evaluador de caminos basado en indicadores ambientales y sus umbrales de seguridad"""
+    
+    def __init__(self):
+        # Definir umbrales seguros para cada indicador
+        self.node_thresholds = {
+            'seismic_activity': {'min': 0.0, 'max': 0.3, 'optimal': 0.0, 'weight': 2.0},
+            'radiation_readings': {'min': 0.0, 'max': 0.5, 'optimal': 0.0, 'weight': 1.8},
+            'population_density': {'min': 0.0, 'max': 0.37, 'optimal': 0.0, 'weight': 1.3},
+            'emergency_calls': {'min': 0.0, 'max': 0.7, 'optimal': 0.3, 'weight': 1.0},
+            'thermal_readings': {'min': 0.0, 'max': 0.2, 'optimal': 0.1, 'weight': 1.5, 
+                                 'alt_min': 0.65, 'alt_max': 1.0, 'alt_optimal': 0.8},
+            'signal_strength': {'min': 0.7, 'max': 1.0, 'optimal': 1.0, 'weight': 1.2},
+            'structural_integrity': {'min': 0.5, 'max': 1.0, 'optimal': 1.0, 'weight': 1.7}
+        }
+        
+        self.edge_thresholds = {
+            'structural_damage': {'min': 0.0, 'max': 0.25, 'optimal': 0.0, 'weight': 2.0},
+            'signal_interference': {'min': 0.0, 'max': 0.34, 'optimal': 0.0, 'weight': 1.2},
+            'movement_sightings': {'min': 0.0, 'max': 0.4, 'optimal': 0.0, 'weight': 1.6},
+            'debris_density': {'min': 0.0, 'max': 0.4, 'optimal': 0.0, 'weight': 1.8},
+            'hazard_gradient': {'min': 0.0, 'max': 0.3, 'optimal': 0.0, 'weight': 1.4}
+        }
+        
+        # Mapeo de indicadores a tipos de recursos necesarios
+        self.resource_mapping = {
+            'structural_damage': 'explosives',
+            'debris_density': 'explosives',
+            'radiation_readings': 'radiation_suits',
+            'movement_sightings': 'ammo',
+            'thermal_readings': 'ammo',
+            'population_density': 'ammo'
+        }
+        
+        # Lista para almacenar problemas encontrados en el camino
+        self.path_problems = []
+    
+    def calculate_node_risk(self, node_data: Dict) -> float:
+        """Calcula el nivel de riesgo de un nodo basado en sus indicadores"""
+        total_risk = 0.0
+        total_weight = 0.0
+        
+        for indicator, threshold in self.node_thresholds.items():
+            if indicator not in node_data:
+                continue
+                
+            value = node_data[indicator]
+            weight = threshold['weight']
+            total_weight += weight
+            
+            # Caso especial para lecturas térmicas que tienen dos rangos óptimos
+            if indicator == 'thermal_readings' and 'alt_min' in threshold:
+                if threshold['min'] <= value <= threshold['max']:
+                    # Dentro del primer rango seguro
+                    risk = 1.0 - (abs(value - threshold['optimal']) / (threshold['max'] - threshold['min']))
+                elif threshold['alt_min'] <= value <= threshold['alt_max']:
+                    # Dentro del segundo rango seguro
+                    risk = 1.0 - (abs(value - threshold['alt_optimal']) / (threshold['alt_max'] - threshold['alt_min']))
+                else:
+                    # Fuera de ambos rangos seguros
+                    min_distance = min(
+                        abs(value - threshold['min']), 
+                        abs(value - threshold['max']),
+                        abs(value - threshold['alt_min']),
+                        abs(value - threshold['alt_max'])
+                    )
+                    risk = 2.0 + min_distance  # Alta penalización por estar fuera de ambos rangos
+            else:
+                # Para indicadores normales
+                if threshold['min'] <= value <= threshold['max']:
+                    # Dentro del rango seguro - calcular qué tan lejos está del óptimo
+                    risk = 1.0 - (abs(value - threshold['optimal']) / (threshold['max'] - threshold['min']))
+                else:
+                    # Fuera del rango seguro - penalización por distancia
+                    min_distance = min(abs(value - threshold['min']), abs(value - threshold['max']))
+                    risk = 2.0 + min_distance  # Alta penalización por estar fuera del rango
+            
+            # Invertir el riesgo para que 0 sea malo y 1 sea bueno, y aplicar peso
+            risk_contribution = (1.0 - risk) * weight
+            total_risk += risk_contribution
+        
+        # Normalizar riesgo por pesos
+        return total_risk / total_weight if total_weight > 0 else 0.0
+    
+    def calculate_edge_risk(self, edge_data: Dict) -> float:
+        """Calcula el nivel de riesgo de un arista basado en sus indicadores"""
+        total_risk = 0.0
+        total_weight = 0.0
+        
+        for indicator, threshold in self.edge_thresholds.items():
+            if indicator not in edge_data:
+                continue
+                
+            value = edge_data[indicator]
+            weight = threshold['weight']
+            total_weight += weight
+            
+            if threshold['min'] <= value <= threshold['max']:
+                # Dentro del rango seguro - calcular qué tan lejos está del óptimo
+                risk = 1.0 - (abs(value - threshold['optimal']) / (threshold['max'] - threshold['min']))
+            else:
+                # Fuera del rango seguro - penalización por distancia
+                min_distance = min(abs(value - threshold['min']), abs(value - threshold['max']))
+                risk = 2.0 + min_distance  # Alta penalización por estar fuera del rango
+            
+            # Invertir el riesgo para que 0 sea malo y 1 sea bueno, y aplicar peso
+            risk_contribution = (1.0 - risk) * weight
+            total_risk += risk_contribution
+        
+        # Normalizar riesgo por pesos
+        return total_risk / total_weight if total_weight > 0 else 0.0
+    
+    def calculate_path_risk(self, path: List[int], node_data: Dict[int, Dict], 
+                           edge_data: Dict[Tuple[int, int], Dict]) -> float:
+        """Calcula el riesgo total de un camino"""
+        total_risk = 0.0
+        explosive_related_risk = 0.0  # Riesgo específico para indicadores relacionados con explosivos
+        
+        # Indicadores relacionados con el uso de explosivos
+        explosive_indicators = [
+            'seismic_activity',  # Nodo
+            'structural_damage',  # Arista
+            'debris_density',     # Arista
+            'structural_integrity'  # Nodo
+        ]
+        
+        # Evaluar nodos en el camino
+        for node in path:
+            if node in node_data:
+                node_risk = self.calculate_node_risk(node_data[node])
+                total_risk += node_risk
+                
+                # Calcular riesgo específico para indicadores relacionados con explosivos
+                for indicator in explosive_indicators:
+                    if indicator in node_data[node]:
+                        value = node_data[node][indicator]
+                        threshold = self.node_thresholds.get(indicator, {'min': 0, 'max': 1})
+                        
+                        # Si está fuera del rango seguro para indicadores críticos, penalizar fuertemente
+                        if indicator == 'seismic_activity' and value > threshold['max']:
+                            explosive_related_risk += 2.0 * (value - threshold['max'])
+                        elif indicator == 'structural_integrity' and value < threshold['min']:
+                            explosive_related_risk += 2.0 * (threshold['min'] - value)
+        
+        # Evaluar aristas en el camino
+        for i in range(len(path) - 1):
+            edge = tuple(sorted([path[i], path[i+1]]))
+            if edge in edge_data:
+                edge_risk = self.calculate_edge_risk(edge_data[edge])
+                total_risk += edge_risk
+                
+                # Calcular riesgo específico para indicadores relacionados con explosivos
+                for indicator in explosive_indicators:
+                    if indicator in edge_data[edge]:
+                        value = edge_data[edge][indicator]
+                        threshold = self.edge_thresholds.get(indicator, {'min': 0, 'max': 1})
+                        
+                        # Si está fuera del rango seguro para indicadores críticos, penalizar fuertemente
+                        if indicator == 'structural_damage' and value > threshold['max']:
+                            explosive_related_risk += 3.0 * (value - threshold['max'])
+                        elif indicator == 'debris_density' and value > threshold['max']:
+                            explosive_related_risk += 2.5 * (value - threshold['max'])
+        
+        # Normalizar por longitud del camino e incluir el riesgo relacionado con explosivos
+        # con un peso extra para priorizar caminos que minimizan el uso de explosivos
+        path_length = len(path) + len(path) - 1 if len(path) > 1 else 1
+        normalized_risk = total_risk / path_length
+        
+        # Dar mayor peso al riesgo relacionado con explosivos (5 veces más importante)
+        final_risk = normalized_risk + (5.0 * explosive_related_risk / path_length)
+        
+        return final_risk
+    
+    def estimate_resources_needed(self, path: List[int], node_data: Dict[int, Dict], 
+                                 edge_data: Dict[Tuple[int, int], Dict]) -> Dict[str, int]:
+        """Estima los recursos necesarios para un camino basado en los indicadores"""
+        resources = {
+            'explosives': 0,
+            'ammo': 0,
+            'radiation_suits': 0
+        }
+        
+        # Registrar problemas para depuración
+        path_problems = []
+        
+        # Analizar nodos
+        for node in path:
+            if node not in node_data:
+                continue
+                
+            # Verificar indicadores que requieren recursos
+            for indicator, resource_type in self.resource_mapping.items():
+                if indicator in node_data[node]:
+                    value = node_data[node][indicator]
+                    
+                    # Ajustar según el indicador específico
+                    if indicator == 'radiation_readings' and value > 0.35:
+                        resources['radiation_suits'] += 1
+                        path_problems.append(f"Nodo {node}: Alta radiación ({value:.2f})")
+                    elif indicator in ('thermal_readings', 'movement_sightings') and value > 0.45:
+                        resources['ammo'] += 1
+                        path_problems.append(f"Nodo {node}: {indicator} elevado ({value:.2f})")
+                    elif indicator == 'population_density' and value > 0.35:
+                        resources['ammo'] += 1
+                        path_problems.append(f"Nodo {node}: Alta densidad poblacional ({value:.2f})")
+        
+        # Analizar aristas
+        for i in range(len(path) - 1):
+            edge = tuple(sorted([path[i], path[i+1]]))
+            if edge not in edge_data:
+                continue
+                
+            # Verificar indicadores que requieren recursos
+            for indicator, resource_type in self.resource_mapping.items():
+                if indicator in edge_data[edge]:
+                    value = edge_data[edge][indicator]
+                    
+                    # Aplicar estrictamente los umbrales para explosivos
+                    if indicator == 'structural_damage':
+                        threshold = self.edge_thresholds[indicator]['max']
+                        if value > threshold:
+                            # Escalar recursos basado en qué tan lejos está del umbral
+                            explosives_needed = int((value - threshold) / 0.25) + 1
+                            resources['explosives'] += explosives_needed
+                            path_problems.append(f"Arista {edge}: Daño estructural alto ({value:.2f}), requiere {explosives_needed} explosivos")
+                    elif indicator == 'debris_density':
+                        threshold = self.edge_thresholds[indicator]['max']
+                        if value > threshold:
+                            # Escalar recursos basado en qué tan lejos está del umbral
+                            explosives_needed = int((value - threshold) / 0.25) + 1
+                            resources['explosives'] += explosives_needed
+                            path_problems.append(f"Arista {edge}: Alta densidad de escombros ({value:.2f}), requiere {explosives_needed} explosivos")
+        
+        # Almacenar problemas para depuración
+        self.path_problems = path_problems
+        
+        return resources
+
+
+class AdvancedPathFinder:
+    """Busca caminos óptimos considerando los indicadores ambientales"""
+    
+    def __init__(self, city_graph, evaluator, node_data, edge_data):
+        self.graph = city_graph
+        self.evaluator = evaluator
+        self.node_data = node_data
+        self.edge_data = edge_data
+        
+    def find_all_paths(self, start_node: int, target_nodes: List[int], max_depth: int = 100) -> List[List[int]]:
+        """
+        Encuentra todos los caminos posibles desde el nodo de inicio a cualquiera de los nodos objetivo.
+        Implementa búsqueda en anchura (BFS) con límite de profundidad para evitar exploraciones infinitas.
+        """
+        if start_node in target_nodes:
+            return [[start_node]]
+            
+        paths = []
+        visited = {start_node: 0}  # Nodo: profundidad
+        queue = [(start_node, [start_node])]
+        
+        while queue:
+            current, path = queue.pop(0)
+            
+            # Verificar si hemos alcanzado el límite de profundidad
+            if visited[current] >= max_depth:
+                continue
+                
+            # Explorar vecinos
+            for neighbor in self.graph.neighbors(current):
+                if neighbor in path:  # Evitar ciclos
+                    continue
+                    
+                # Crear nuevo camino agregando este vecino
+                new_path = path + [neighbor]
+                
+                # Si es un nodo objetivo, guardar el camino
+                if neighbor in target_nodes:
+                    paths.append(new_path)
+                else:
+                    # De lo contrario, añadir a la cola para seguir explorando
+                    queue.append((neighbor, new_path))
+                    # Marcar como visitado con su profundidad
+                    visited[neighbor] = visited[current] + 1
+        
+        return paths
+        
+    def find_k_shortest_paths(self, start_node: int, target_nodes: List[int], k: int = 10, max_length: int = 50) -> List[List[int]]:
+        """
+        Encuentra los k caminos más cortos desde el nodo de inicio a cualquiera de los nodos objetivo.
+        Usa el algoritmo de Yen para k-caminos más cortos
+        """
+        # Si el nodo de inicio es un nodo objetivo, retornar inmediatamente
+        if start_node in target_nodes:
+            return [[start_node]]
+            
+        # Inicializar lista de caminos más cortos
+        shortest_paths = []
+        
+        # Para cada nodo objetivo, encontrar varios caminos alternos
+        for target in target_nodes:
+            try:
+                # Calculamos todos los caminos posibles usando diferentes métricas
+                # 1. Camino más corto por distancia
+                path_by_distance = nx.shortest_path(self.graph, start_node, target, weight='weight')
+                
+                # 2. Camino que minimiza indicadores relacionados con explosivos
+                # Crear una copia del grafo con pesos personalizados
+                G_custom = self.graph.copy()
+                
+                # Asignar pesos en función de los indicadores relacionados con explosivos
+                for u, v, data in G_custom.edges(data=True):
+                    edge = tuple(sorted([u, v]))
+                    weight = data.get('weight', 1.0)
+                    
+                    # Aumentar peso basado en daño estructural y densidad de escombros
+                    if edge in self.edge_data:
+                        edge_info = self.edge_data[edge]
+                        structural_damage = edge_info.get('structural_damage', 0)
+                        debris_density = edge_info.get('debris_density', 0)
+                        
+                        # Penalizar fuertemente valores por encima del umbral
+                        if structural_damage > 0.25:
+                            weight *= (1 + 5 * (structural_damage - 0.25))
+                        if debris_density > 0.4:
+                            weight *= (1 + 3 * (debris_density - 0.4))
+                    
+                    G_custom[u][v]['weight'] = weight
+                
+                try:
+                    # Intentar encontrar camino que minimiza uso de explosivos
+                    path_by_explosives = nx.shortest_path(G_custom, start_node, target, weight='weight')
+                    if len(path_by_explosives) <= max_length and path_by_explosives not in shortest_paths:
+                        path_length = nx.path_weight(self.graph, path_by_explosives, weight='weight')
+                        shortest_paths.append((path_by_explosives, path_length))
+                except nx.NetworkXNoPath:
+                    pass  # No hay camino en este grafo personalizado
+                
+                # Agregar el camino por distancia si no es muy largo
+                if len(path_by_distance) <= max_length and path_by_distance not in [p for p, _ in shortest_paths]:
+                    path_length = nx.path_weight(self.graph, path_by_distance, weight='weight')
+                    shortest_paths.append((path_by_distance, path_length))
+                    
+            except nx.NetworkXNoPath:
+                continue  # No hay camino a este nodo objetivo
+        
+        # Ordenar por longitud/peso
+        shortest_paths.sort(key=lambda x: x[1])
+        
+        # Eliminar duplicados manteniendo el orden
+        unique_paths = []
+        seen = set()
+        for path, _ in shortest_paths:
+            path_tuple = tuple(path)
+            if path_tuple not in seen:
+                seen.add(path_tuple)
+                unique_paths.append(path)
+        
+        # Limitar a k caminos únicos
+        return unique_paths[:k]
+    
+    def evaluate_paths(self, paths: List[List[int]]) -> List[Tuple[List[int], float, Dict[str, int]]]:
+        """
+        Evalúa todos los caminos según su riesgo y recursos necesarios.
+        Retorna los caminos ordenados por menor riesgo junto con su puntuación y recursos estimados.
+        """
+        evaluated_paths = []
+        
+        for path in paths:
+            # Calcular riesgo del camino
+            risk = self.evaluator.calculate_path_risk(path, self.node_data, self.edge_data)
+            
+            # Estimar recursos necesarios
+            resources = self.evaluator.estimate_resources_needed(path, self.node_data, self.edge_data)
+            
+            evaluated_paths.append((path, risk, resources))
+        
+        # Ordenar por riesgo (menor es mejor)
+        evaluated_paths.sort(key=lambda x: x[1])
+        
+        return evaluated_paths
+    
+    def find_optimal_path(self, start_node: int, target_nodes: List[int], 
+                        max_resources: int) -> Tuple[List[int], Dict[str, int]]:
+        """
+        Encuentra el camino óptimo considerando tanto riesgo como recursos disponibles.
+        """
+        # Buscar varios caminos candidatos (los más cortos)
+        candidate_paths = self.find_k_shortest_paths(start_node, target_nodes, k=15, max_length=40)
+        
+        # Si no hay caminos posibles, retornar camino vacío
+        if not candidate_paths:
+            print("INFO: No se encontraron caminos candidatos entre el nodo inicial y los nodos de extracción.")
+            return [start_node], {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+        
+        print(f"INFO: Se encontraron {len(candidate_paths)} caminos candidatos para evaluar.")
+        
+        # Evaluar los caminos
+        evaluated_paths = self.evaluate_paths(candidate_paths)
+        
+        # Filtrar caminos que requieren más recursos de los disponibles
+        feasible_paths = []
+        for path, risk, resources in evaluated_paths:
+            total_resources = sum(resources.values())
+            if total_resources <= max_resources:
+                feasible_paths.append((path, risk, resources))
+        
+        print(f"INFO: {len(feasible_paths)}/{len(evaluated_paths)} caminos son factibles con {max_resources} recursos disponibles.")
+        
+        # Si no hay caminos factibles, tomar el que requiere menos recursos
+        if not feasible_paths:
+            print("ADVERTENCIA: No hay caminos factibles con los recursos disponibles. Adaptando mejor opción...")
+            evaluated_paths.sort(key=lambda x: sum(x[2].values()))
+            best_path, risk, estimated_resources = evaluated_paths[0]
+            
+            print(f"INFO: Mejor camino encontrado requiere {sum(estimated_resources.values())} recursos (riesgo: {risk:.2f}).")
+            
+            # Ajustar recursos al máximo disponible
+            if sum(estimated_resources.values()) > max_resources:
+                # Distribución proporcional
+                adjusted_resources = self._adjust_resources(estimated_resources, max_resources)
+                return best_path, adjusted_resources
+            
+            return best_path, estimated_resources
+        
+        # Seleccionar el camino factible con menor riesgo
+        best_path, risk, estimated_resources = feasible_paths[0]
+        print(f"INFO: Camino óptimo encontrado con riesgo {risk:.2f} requiere {sum(estimated_resources.values())} recursos.")
+        
+        # Asegurar que se usen todos los recursos disponibles de manera óptima
+        optimized_resources = self._optimize_resources(estimated_resources, max_resources)
+        
+        # Imprimir detalles sobre la distribución de recursos
+        print(f"INFO: Distribución de recursos: {optimized_resources}")
+        
+        return best_path, optimized_resources
+    
+    def _adjust_resources(self, estimated_resources: Dict[str, int], max_resources: int) -> Dict[str, int]:
+        """Ajusta los recursos cuando no hay suficientes disponibles"""
+        total_estimated = sum(estimated_resources.values())
+        
+        if total_estimated <= max_resources:
+            return estimated_resources
+        
+        # Primero asegurar un mínimo de trajes de radiación y municiones
+        adjusted = {}
+        
+        # Reservar recursos mínimos para trajes y municiones
+        min_radiation_suits = min(estimated_resources['radiation_suits'], max(2, int(max_resources * 0.3)))
+        min_ammo = min(estimated_resources['ammo'], max(2, int(max_resources * 0.3)))
+        
+        # Asegurar que hay suficientes recursos para estos mínimos
+        if min_radiation_suits + min_ammo > max_resources:
+            # Reducir proporcionalmente si no hay suficientes
+            ratio = max_resources / (min_radiation_suits + min_ammo)
+            min_radiation_suits = max(1, int(min_radiation_suits * ratio))
+            min_ammo = max(1, int(min_ammo * ratio))
+        
+        adjusted['radiation_suits'] = min_radiation_suits
+        adjusted['ammo'] = min_ammo
+        
+        # Asignar el resto a explosivos, pero asegurando un mínimo si es necesario
+        remaining = max_resources - min_radiation_suits - min_ammo
+        min_explosives = min(1, estimated_resources['explosives'])
+        
+        adjusted['explosives'] = min(estimated_resources['explosives'], max(min_explosives, remaining))
+        
+        # Si aún queda espacio, distribuir proporcionalmente entre trajes y municiones
+        remaining = max_resources - sum(adjusted.values())
+        if remaining > 0:
+            # Calcular proporciones de necesidad restante
+            rad_need = max(0, estimated_resources['radiation_suits'] - adjusted['radiation_suits'])
+            ammo_need = max(0, estimated_resources['ammo'] - adjusted['ammo'])
+            total_need = rad_need + ammo_need
+            
+            if total_need > 0:
+                # Distribuir proporcionalmente a necesidades
+                rad_add = int(remaining * (rad_need / total_need))
+                adjusted['radiation_suits'] += rad_add
+                adjusted['ammo'] += remaining - rad_add
+        
+        return adjusted
+    
+    def _optimize_resources(self, estimated_resources: Dict[str, int], max_resources: int) -> Dict[str, int]:
+        """Optimiza la asignación de recursos para usar todo el presupuesto disponible"""
+        total_estimated = sum(estimated_resources.values())
+        
+        # Si ya estamos usando todos los recursos o más, ajustar a lo necesario
+        if total_estimated >= max_resources:
+            return self._adjust_resources(estimated_resources, max_resources)
+        
+        # Si hay recursos adicionales disponibles, asignarlos según prioridad
+        optimized = estimated_resources.copy()
+        remaining = max_resources - total_estimated
+        
+        # Prioridad modificada para asignación adicional, favoreciendo trajes y municiones
+        # pero manteniendo un mínimo de explosivos
+        if optimized['explosives'] < 2 and remaining > 0:
+            # Asegurar un mínimo de explosivos para emergencias
+            add_explosives = min(2 - optimized['explosives'], remaining)
+            optimized['explosives'] += add_explosives
+            remaining -= add_explosives
+        
+        # Prioridad para recursos adicionales: 60% radiación, 35% munición, 5% explosivos
+        while remaining > 0:
+            # Si tenemos suficientes recursos para distribuir proporcionalmente
+            if remaining >= 10:
+                rad_add = int(remaining * 0.6)
+                ammo_add = int(remaining * 0.35)
+                exp_add = remaining - rad_add - ammo_add
+                
+                optimized['radiation_suits'] += rad_add
+                optimized['ammo'] += ammo_add
+                optimized['explosives'] += exp_add
+                remaining = 0
+            else:
+                # Distribuir uno por uno según prioridad
+                priority_order = ['radiation_suits', 'ammo', 'radiation_suits', 'ammo', 'radiation_suits', 'ammo', 'explosives']
+                
+                for resource in priority_order[:remaining]:
+                    optimized[resource] += 1
+                    
+                remaining = 0
+        
+        return optimized
+    
 class EvacuationPolicy:
     """
     Tu implementación de la política de evacuación.
@@ -58,7 +591,7 @@ class EvacuationPolicy:
         # print(f'Max Resources: {max_resources} \n \n')
         
         
-        self.policy_type = "policy_3" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
+        self.policy_type = "policy_4" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
         
         if self.policy_type == "policy_1":
             return self._policy_1(city, proxy_data, max_resources)
@@ -70,6 +603,60 @@ class EvacuationPolicy:
             return self._policy_4(city, proxy_data, max_resources)
     
     def _policy_1(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
+        """
+        Política 1: Estrategia básica sin uso de proxies.
+        Solo utiliza información básica de nodos y aristas para tomar decisiones.
+        
+        Esta política debe:
+        - NO utilizar los proxies
+        - Solo usar información básica del grafo (nodos, aristas, pesos)
+        - Implementar una estrategia válida para cualquier ciudad
+        """
+        # Verificar si hay un camino a algún nodo de extracción
+        valid_paths = []
+        
+        for target in city.extraction_nodes:
+            try:
+                # Intentar encontrar el camino más corto al nodo de extracción
+                path = nx.shortest_path(city.graph, city.starting_node, target, weight='weight')
+                # Calcular la longitud real del camino (suma de pesos)
+                path_length = sum(city.graph[path[i]][path[i+1]]['weight'] for i in range(len(path)-1))
+                valid_paths.append((path, path_length))
+            except nx.NetworkXNoPath:
+                # No hay camino a este nodo de extracción
+                continue
+        
+        # Si no hay caminos válidos a ningún nodo de extracción
+        if not valid_paths:
+            # Si el grafo no es conexo para nuestros puntos de interés, devolvemos solo el nodo inicial
+            # y no asignamos recursos (conforme a la instrucción)
+            return PolicyResult([city.starting_node], {'explosives': 0, 'ammo': 0, 'radiation_suits': 0})
+        
+        # Encontrar el camino más corto entre todos los válidos
+        best_path, _ = min(valid_paths, key=lambda x: x[1])
+        
+        # Distribuir los recursos de manera equitativa (33% cada uno)
+        resources_per_type = max_resources // 3
+        
+        # Manejar casos donde max_resources no es divisible por 3
+        remaining = max_resources - (resources_per_type * 3)
+        
+        resources = {
+            'explosives': resources_per_type,
+            'ammo': resources_per_type,
+            'radiation_suits': resources_per_type
+        }
+        
+        # Distribuir los recursos restantes (si hay) de manera secuencial
+        # Sin preferencia específica, ya que no tenemos datos previos
+        if remaining > 0:
+            resource_types = ['explosives', 'ammo', 'radiation_suits']
+            for i in range(remaining):
+                resources[resource_types[i]] += 1
+        
+        return PolicyResult(best_path, resources)
+
+    def _policy_1_j(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política optimizada basada en correlaciones con éxito de misión.
         
@@ -474,37 +1061,65 @@ class EvacuationPolicy:
         
         return PolicyResult(best_path, resources)
 
-    def _policy_4(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
+    def _policy_4(self, city, proxy_data, max_resources):
         """
-        Política 4: Estrategia personalizada.
-        Implementa tu mejor estrategia usando cualquier recurso disponible.
+        Política 4: Estrategia avanzada de optimización de rutas y recursos.
         
-        Esta política puede:
-        - Usar cualquier técnica o recurso que consideres apropiado
-        - Implementar estrategias avanzadas de tu elección
+        Esta política implementa:
+        1. Evaluación detallada de cada indicador ambiental
+        2. Búsqueda inteligente de rutas óptimas
+        3. Asignación de recursos basada en necesidades específicas del camino
         """
-        # TODO: Implementa tu solución aquí
-        proxy_data_nodes_df = convert_node_data_to_df(proxy_data.node_data)
-        proxy_data_edges_df = convert_edge_data_to_df(proxy_data.edge_data)
-        
-        #print(f'\n Node Data: \n {proxy_data_nodes_df}')
-        #print(f'\n Edge Data: \n {proxy_data_edges_df}')
-        
-        target = city.extraction_nodes[0]
-        
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
+        # Convertir datos de proxy a formato adecuado
+        node_data = {int(node_id): data for node_id, data in proxy_data.node_data.items()}
+        edge_data = {}
+        for edge_key, data in proxy_data.edge_data.items():
+            # Convertir representación de borde a tupla de enteros
+            if isinstance(edge_key, tuple):
+                edge = edge_key
+            else:
+                # Para el caso en que edge_key sea un string como "(node1, node2)"
+                try:
+                    # Intenta manejar diferentes formatos posibles de edge_key
+                    if isinstance(edge_key, str) and "_" in edge_key:
+                        parts = edge_key.split('_')
+                        edge = (int(parts[0]), int(parts[1]))
+                    elif isinstance(edge_key, str) and "," in edge_key:
+                        parts = edge_key.strip('()').split(',')
+                        edge = (int(parts[0].strip()), int(parts[1].strip()))
+                    else:
+                        continue  # Ignorar formato inválido
+                except (ValueError, IndexError):
+                    continue  # Ignorar formatos que no se pueden interpretar
             
-        resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
-        }
+            edge_data[edge] = data
         
-        return PolicyResult(path, resources)
+        # Inicializar evaluador y buscador de caminos
+        evaluator = PathEvaluator()
+        pathfinder = AdvancedPathFinder(city.graph, evaluator, node_data, edge_data)
+        
+        # Verificar si hay algún camino posible a los nodos de extracción
+        has_path = False
+        for target in city.extraction_nodes:
+            try:
+                nx.has_path(city.graph, city.starting_node, target)
+                has_path = True
+                break
+            except:
+                continue
+        
+        # Si no hay camino posible, retornar sin asignar recursos
+        if not has_path:
+            return [city.starting_node], {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+        
+        # Encontrar el camino óptimo
+        best_path, optimal_resources = pathfinder.find_optimal_path(
+            city.starting_node, 
+            city.extraction_nodes,
+            max_resources
+        )
+        
+        return PolicyResult(best_path, optimal_resources)
     
     
     
