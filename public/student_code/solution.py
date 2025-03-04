@@ -156,8 +156,8 @@ class EvacuationPolicy:
         # Trajes de radiación (45%), munición (35%), explosivos (20%)
         resources = {
             'radiation_suits': int(max_resources * 0.45),
-            'ammo': int(max_resources * 0.393),
-            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.393)
+            'ammo': int(max_resources * 0.35),
+            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.35)
         }
         
         
