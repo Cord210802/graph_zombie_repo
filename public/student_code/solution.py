@@ -468,8 +468,8 @@ class EvacuationPolicy:
         
         resources = {
             'radiation_suits': int(max_resources * 0.45),
-            'ammo': int(max_resources * 0.35),
-            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.35)
+            'ammo': int(max_resources * 0.393),
+            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.393)
         }
         
         return PolicyResult(best_path, resources)
