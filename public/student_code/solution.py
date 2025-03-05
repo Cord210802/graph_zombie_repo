@@ -58,10 +58,10 @@ class EvacuationPolicy:
         # print(f'Max Resources: {max_resources} \n \n')
         
         
-        self.policy_type = "policy_1" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
+        self.policy_type = "policy_4" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
         
         if self.policy_type == "policy_1":
-            return self._policy_1(city, max_resources)
+            return self._policy_1(city, proxy_data, max_resources)
         elif self.policy_type == "policy_2":
             return self._policy_2(city, proxy_data, max_resources)
         elif self.policy_type == "policy_3":
@@ -201,64 +201,224 @@ class EvacuationPolicy:
     
     def _policy_3(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política 3: Estrategia usando datos de simulaciones previas.
-        Utiliza estadísticas básicas de simulaciones anteriores para mejorar la toma de decisiones.
-        
-        Esta política debe:
-        - Utilizar datos de simulaciones previas
-        - Implementar mejoras basadas en estadísticas básicas
-        - NO usar modelos de machine learning
+        Política inspirada en el enfoque proporcionado, que busca el camino con el menor número de problemas
+        y asigna recursos en función de los problemas encontrados.
         """
-        # TODO: Implementa tu solución aquí
-        # Aquí deberías cargar y analizar datos de simulaciones previas
-        
-        target = city.extraction_nodes[0]
-        
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
+        # Definir los umbrales para los problemas
+        THERMAL_THRESHOLD = 0.39
+        RADIATION_THRESHOLD = 0.4
+        DEBRIS_THRESHOLD = 0.48
+    
+        # Crear un grafo ponderado
+        weighted_graph = city.graph.copy()
+
+        # Asignar pesos a los nodos basados en problemas
+        for node in weighted_graph.nodes():
+            node_key = node  # Usar el nodo directamente (asumiendo que las claves son enteros)
+            node_data = proxy_data.node_data.get(node_key, {})
             
+            # Contar problemas en el nodo (uno por tipo)
+            thermal_problem = 1 if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD else 0
+            radiation_problem = 1 if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD else 0
+            
+            # Peso del nodo: suma de problemas
+            weighted_graph.nodes[node]["weight"] = thermal_problem + radiation_problem
+
+        # Asignar pesos a las aristas basados en problemas
+        for u, v in weighted_graph.edges():
+            edge = tuple(sorted([u, v]))  # Normalizar la clave de la arista
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= DEBRIS_THRESHOLD
+        
+            
+            # Peso de la arista: 1 si tiene algún problema, 0 si no
+            weighted_graph[u][v]["weight"] = 1 if (has_blockage) else 0
+
+        # Encontrar el camino con el menor peso total usando Dijkstra
+        best_path = None
+        min_weight = float('inf')
+
+        for target in city.extraction_nodes:
+            try:
+                # Usar Dijkstra para encontrar el camino más corto en términos de peso
+                path = nx.dijkstra_path(weighted_graph, city.starting_node, target, weight="weight")
+                path_weight = nx.path_weight(weighted_graph, path, weight="weight")
+                
+                if path_weight < min_weight:
+                    min_weight = path_weight
+                    best_path = path
+            except nx.NetworkXNoPath:
+                continue
+
+        # Si no encontramos ningún camino, nos quedamos en el nodo inicial
+        if best_path is None:
+            best_path = [city.starting_node]
+
+        # Contar problemas en el mejor camino
+        thermal_problems = 0
+        radiation_problems = 0
+        explosives_problems = 0  # Incluye problemas sísmicos, de bloqueo y de daño estructural
+
+        # Contar problemas en nodos (excluyendo el último nodo)
+        for node in best_path[:-1]:  # Excluir el último nodo
+            node_key = node
+            node_data = proxy_data.node_data.get(node_key, {})
+            
+            # Contar problemas en el nodo (uno por tipo)
+            if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD:
+                thermal_problems += 1  # Problema térmico (ammo)
+            if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD:
+                radiation_problems += 1  # Problema de radiación (radiation_suits)
+
+        # Contar problemas en aristas (excluyendo la última arista)
+        for i in range(len(best_path) - 2):  # Excluir la última arista
+            u = best_path[i]
+            v = best_path[i + 1]
+            edge = tuple(sorted([u, v]))
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= DEBRIS_THRESHOLD
+            
+            if has_blockage:
+                explosives_problems += 1  # Problema de bloqueo o daño estructural (explosives)
+
+        # Asignar recursos en función de los problemas
         resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
+            'radiation_suits': radiation_problems,  # 1 por problema de radiación
+            'ammo': thermal_problems,               # 1 por problema de thermal
+            'explosives': explosives_problems       # 1 por problema sísmico, de bloqueo o de daño estructural
         }
         
-        return PolicyResult(path, resources)
+        # Calcular el total de recursos asignados
+        total_assigned = sum(resources.values())
+
+        # Si sobran recursos, distribuirlos equitativamente
+        remaining_resources = max_resources - total_assigned
+        if remaining_resources > 0:
+            resources['radiation_suits'] += remaining_resources // 3
+            resources['ammo'] += remaining_resources // 3
+            resources['explosives'] += remaining_resources // 3
+
+            # Asignar el resto si no es divisible exactamente
+            remainder = remaining_resources % 3
+            if remainder >= 1:
+                resources['radiation_suits'] += 1
+            if remainder >= 2:
+                resources['ammo'] += 1
+
+        return PolicyResult(best_path, resources)
     
     def _policy_4(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política 4: Estrategia personalizada.
-        Implementa tu mejor estrategia usando cualquier recurso disponible.
-        
-        Esta política puede:
-        - Usar cualquier técnica o recurso que consideres apropiado
-        - Implementar estrategias avanzadas de tu elección
+        Política inspirada en el enfoque proporcionado, que busca el camino con el menor número de problemas
+        y asigna recursos en función de los problemas encontrados.
         """
-        # TODO: Implementa tu solución aquí
-        proxy_data_nodes_df = convert_node_data_to_df(proxy_data.node_data)
-        proxy_data_edges_df = convert_edge_data_to_df(proxy_data.edge_data)
-        
-        #print(f'\n Node Data: \n {proxy_data_nodes_df}')
-        #print(f'\n Edge Data: \n {proxy_data_edges_df}')
-        
-        target = city.extraction_nodes[0]
-        
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
+        # Definir los umbrales para los problemas
+        THERMAL_THRESHOLD = 0.2
+        RADIATION_THRESHOLD = 0.18
+        DEBRIS_THRESHOLD = 0.27
+    
+        # Crear un grafo ponderado
+        weighted_graph = city.graph.copy()
+
+        # Asignar pesos a los nodos basados en problemas
+        for node in weighted_graph.nodes():
+            node_key = node  # Usar el nodo directamente (asumiendo que las claves son enteros)
+            node_data = proxy_data.node_data.get(node_key, {})
             
+            # Contar problemas en el nodo (uno por tipo)
+            thermal_problem = 1 if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD else 0
+            radiation_problem = 1 if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD else 0
+            
+            # Peso del nodo: suma de problemas
+            weighted_graph.nodes[node]["weight"] = thermal_problem + radiation_problem
+
+        # Asignar pesos a las aristas basados en problemas
+        for u, v in weighted_graph.edges():
+            edge = tuple(sorted([u, v]))  # Normalizar la clave de la arista
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= DEBRIS_THRESHOLD
+        
+            
+            # Peso de la arista: 1 si tiene algún problema, 0 si no
+            weighted_graph[u][v]["weight"] = 1 if (has_blockage) else 0
+
+        # Encontrar el camino con el menor peso total usando Dijkstra
+        best_path = None
+        min_weight = float('inf')
+
+        for target in city.extraction_nodes:
+            try:
+                # Usar Dijkstra para encontrar el camino más corto en términos de peso
+                path = nx.dijkstra_path(weighted_graph, city.starting_node, target, weight="weight")
+                path_weight = nx.path_weight(weighted_graph, path, weight="weight")
+                
+                if path_weight < min_weight:
+                    min_weight = path_weight
+                    best_path = path
+            except nx.NetworkXNoPath:
+                continue
+
+        # Si no encontramos ningún camino, nos quedamos en el nodo inicial
+        if best_path is None:
+            best_path = [city.starting_node]
+
+        # Contar problemas en el mejor camino
+        thermal_problems = 0
+        radiation_problems = 0
+        explosives_problems = 0  # Incluye problemas sísmicos, de bloqueo y de daño estructural
+
+        # Contar problemas en nodos (excluyendo el último nodo)
+        for node in best_path[:-1]:  # Excluir el último nodo
+            node_key = node
+            node_data = proxy_data.node_data.get(node_key, {})
+            
+            # Contar problemas en el nodo (uno por tipo)
+            if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD:
+                thermal_problems += 1  # Problema térmico (ammo)
+            if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD:
+                radiation_problems += 1  # Problema de radiación (radiation_suits)
+
+        # Contar problemas en aristas (excluyendo la última arista)
+        for i in range(len(best_path) - 2):  # Excluir la última arista
+            u = best_path[i]
+            v = best_path[i + 1]
+            edge = tuple(sorted([u, v]))
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= DEBRIS_THRESHOLD
+            
+            if has_blockage:
+                explosives_problems += 1  # Problema de bloqueo o daño estructural (explosives)
+
+        # Asignar recursos en función de los problemas
         resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
+            'radiation_suits': radiation_problems,  # 1 por problema de radiación
+            'ammo': thermal_problems,               # 1 por problema de thermal
+            'explosives': explosives_problems       # 1 por problema sísmico, de bloqueo o de daño estructural
         }
         
-        return PolicyResult(path, resources)
-    
-    
-    
+        # Calcular el total de recursos asignados
+        total_assigned = sum(resources.values())
+
+        # Si sobran recursos, distribuirlos equitativamente
+        remaining_resources = max_resources - total_assigned
+        if remaining_resources > 0:
+            resources['radiation_suits'] += remaining_resources // 3
+            resources['ammo'] += remaining_resources // 3
+            resources['explosives'] += remaining_resources // 3
+
+            # Asignar el resto si no es divisible exactamente
+            remainder = remaining_resources % 3
+            if remainder >= 1:
+                resources['radiation_suits'] += 1
+            if remainder >= 2:
+                resources['ammo'] += 1
+
+        return PolicyResult(best_path, resources)

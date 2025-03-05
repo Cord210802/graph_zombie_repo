@@ -5,9 +5,9 @@ POLICY_NAME =  "EvacuationPolicy"
 CONFIG = {
         'node_range': {
             'min': 20,
-            'max': 70
+            'max': 50
         },
-        'n_runs': 500,  # Total number of cities to simulate
+        'n_runs': 100,  # Total number of cities to simulate
         'base_seed': 7354681  # For reproducibility
     }
 
