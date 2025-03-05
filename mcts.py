@@ -1,101 +1,121 @@
 import random
 import time
-from typing import List, Dict
-
-# Configuración global
-THERMAL_THRESHOLD1 = 0.2
-RADIATION_THRESHOLD1 = 0.1
-BLOCKAGE_THRESHOLD1 = 0.2
-SKIP_CITY_ANALYSIS = True
-POLICY_NAME = "EvacuationPolicy"
-CONFIG = {
-    'node_range': {
-        'min': 20,
-        'max': 50
-    },
-    'n_runs': 200,  # Total number of cities to simulate
-    'base_seed': 7354681  # For reproducibility
-}
-
-from public.tools.run_bulk import BulkRunner
-from public.student_code.solution import EvacuationPolicy
-from public.visualization.bulk_analysis import generate_all_visualizations
-from public.visualization.city_analysis import analyze_city_scenario
 import os
 import json
 import argparse
 import networkx as nx
-from typing import Dict, List, Literal
+from typing import Dict, List, Tuple
+import numpy as np
+
+from public.tools.run_bulk import BulkRunner
+from public.student_code.solution import EvacuationPolicy
 from public.lib.interfaces import CityGraph, ProxyData, PolicyResult
-from public.student_code.convert_to_df import convert_edge_data_to_df, convert_node_data_to_df
 
+# Configuración base
+BASE_THERMAL_THRESHOLD = 0.2
+BASE_RADIATION_THRESHOLD = 0.1
+BASE_BLOCKAGE_THRESHOLD = 0.2
 
-def main():
-    parser = argparse.ArgumentParser(description='Run bulk simulations with Monte Carlo Search for resource allocation')
-    parser.add_argument('--skip-city-analysis', action='store_true',
-                        help='Skip individual city analysis to save time')
-    args = parser.parse_args()
-
-    # Determinar si se omite el análisis de ciudades individuales
-    skip_city_analysis = args.skip_city_analysis or SKIP_CITY_ANALYSIS
-
-    # Configuración para las ejecuciones en bulk
-    config = CONFIG
-    policy_name = POLICY_NAME
-
+def run_monte_carlo_search(
+    n_iterations=100,
+    n_runs=100,
+    base_seed=7354681,
+    offset_range=0.1
+):
+    """
+    Realiza una búsqueda de Monte Carlo para encontrar los umbrales óptimos.
+    
+    Args:
+        n_iterations: Número de iteraciones de Monte Carlo
+        n_runs: Número de simulaciones por iteración
+        base_seed: Semilla para reproducibilidad
+        offset_range: Rango de offset para los umbrales (+/-)
+    
+    Returns:
+        Dict: Resultados de la búsqueda
+    """
+    # Configuración de las simulaciones
+    config = {
+        'node_range': {
+            'min': 20,
+            'max': 50
+        },
+        'n_runs': n_runs,
+        'base_seed': base_seed
+    }
+    
     # Crear el ejecutor en bulk
     runner = BulkRunner(
-        policy_name=policy_name,
+        policy_name="EvacuationPolicy",
         base_seed=config['base_seed']
     )
-
-    # Crear la política (usaremos la política 4 hardcodeada)
+    
+    # Crear la política
     policy = EvacuationPolicy()
-    policy.set_policy("policy_4")  # Hardcodeamos la política 4
-
+    policy.set_policy("policy_4")
+    
     # Guardar la referencia original al método
     original_policy_4 = policy._policy_4
-
-    # Parámetros de Monte Carlo Search
-    n_iterations = 100  # Número de iteraciones de Monte Carlo
+    
+    # Mejores umbrales encontrados
     best_success_rate = 0
     best_thresholds = {
-        'THERMAL_THRESHOLD': 0.2,
-        'RADIATION_THRESHOLD': 0.1,
-        'BLOCKAGE_THRESHOLD': 0.21
+        'THERMAL_THRESHOLD': BASE_THERMAL_THRESHOLD,
+        'RADIATION_THRESHOLD': BASE_RADIATION_THRESHOLD,
+        'BLOCKAGE_THRESHOLD': BASE_BLOCKAGE_THRESHOLD
     }
-
-    # Función para generar umbrales aleatorios
-    def generate_random_thresholds():
-        # Base thresholds
-        THERMAL_THRESHOLD1 = 0.2
-        RADIATION_THRESHOLD1 = 0.1
-        BLOCKAGE_THRESHOLD1 = 0.21
-
-        # Generate random offsets rounded to 2 decimal places
-        thermal_offset = round(random.uniform(-0.1, 0.1), 2)
-        radiation_offset = round(random.uniform(-0.1, 0.1), 2)
-        blockage_offset = round(random.uniform(-0.1, 0.1), 2)
-
-        # Ensure the final thresholds are rounded to 2 decimal places
-        return {
-            'THERMAL_THRESHOLD': round(THERMAL_THRESHOLD1 + thermal_offset, 2),
-            'RADIATION_THRESHOLD': round(RADIATION_THRESHOLD1 + radiation_offset, 2),
-            'BLOCKAGE_THRESHOLD': round(BLOCKAGE_THRESHOLD1 + blockage_offset, 2)
-        }
+    
+    # Historial de resultados
+    results_history = []
+    tested_combinations = set()
+    
+    # Variable para los umbrales actuales (accesible en el ámbito de custom_policy_4)
+    current_thresholds = best_thresholds.copy()
+    
+    # Pre-generar todas las combinaciones de umbrales necesarias
+    all_thresholds = []
+    
+    # Generamos valores con incrementos de 0.02 dentro del rango ±0.1 de los valores base
+    thermal_values = [round(BASE_THERMAL_THRESHOLD + i * 0.02, 2) for i in range(-5, 6)]  # -0.1 a +0.1
+    radiation_values = [round(BASE_RADIATION_THRESHOLD + i * 0.02, 2) for i in range(-5, 6)]  # -0.1 a +0.1
+    blockage_values = [round(BASE_BLOCKAGE_THRESHOLD + i * 0.02, 2) for i in range(-5, 6)]  # -0.1 a +0.1
+    
+    # Restringir a valores válidos (mínimo 0.05)
+    thermal_values = [max(0.05, t) for t in thermal_values]
+    radiation_values = [max(0.05, r) for r in radiation_values]
+    blockage_values = [max(0.05, b) for b in blockage_values]
+    
+    # Generar combinaciones sistemáticas
+    for t in thermal_values:
+        for r in radiation_values:
+            for b in blockage_values:
+                combo = (t, r, b)
+                if combo not in tested_combinations:
+                    all_thresholds.append({
+                        'THERMAL_THRESHOLD': t, 
+                        'RADIATION_THRESHOLD': r, 
+                        'BLOCKAGE_THRESHOLD': b
+                    })
+                    tested_combinations.add(combo)
+    
+    # Limitar a las primeras n_iterations (o todas si hay menos)
+    if len(all_thresholds) > n_iterations:
+        random.shuffle(all_thresholds)
+        all_thresholds = all_thresholds[:n_iterations]
+    
     # Función para modificar la política con nuevos umbrales
     def custom_policy_4(city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         # Usar los umbrales actuales
-        THERMAL_THRESHOLD = best_thresholds['THERMAL_THRESHOLD']
-        RADIATION_THRESHOLD = best_thresholds['RADIATION_THRESHOLD']
-        BLOCKAGE_THRESHOLD = best_thresholds['BLOCKAGE_THRESHOLD']
+        THERMAL_THRESHOLD = current_thresholds['THERMAL_THRESHOLD']
+        RADIATION_THRESHOLD = current_thresholds['RADIATION_THRESHOLD']
+        BLOCKAGE_THRESHOLD = current_thresholds['BLOCKAGE_THRESHOLD']
 
         # Crear un grafo ponderado
         weighted_graph = city.graph.copy()
 
         # Asignar pesos a los nodos basados en problemas
         for node in weighted_graph.nodes():
-            node_key = node  # Usar el nodo directamente (asumiendo que las claves son enteros)
+            node_key = node
             node_data = proxy_data.node_data.get(node_key, {})
             
             # Contar problemas en el nodo (uno por tipo)
@@ -114,7 +134,7 @@ def main():
             has_blockage = edge_data.get("debris_density", 0) >= BLOCKAGE_THRESHOLD
         
             # Peso de la arista: 1 si tiene algún problema, 0 si no
-            weighted_graph[u][v]["weight"] = 1 if (has_blockage) else 0
+            weighted_graph[u][v]["weight"] = 1 if has_blockage else 0
 
         # Encontrar el camino con el menor peso total usando Dijkstra
         best_path = None
@@ -139,10 +159,10 @@ def main():
         # Contar problemas en el mejor camino
         thermal_problems = 0
         radiation_problems = 0
-        explosives_problems = 0  # Incluye problemas sísmicos, de bloqueo y de daño estructural
+        explosives_problems = 0
 
         # Contar problemas en nodos (excluyendo el último nodo)
-        for node in best_path[:-1]:  # Excluir el último nodo
+        for node in best_path[:-1]:
             node_key = node
             node_data = proxy_data.node_data.get(node_key, {})
             
@@ -152,24 +172,24 @@ def main():
             if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD:
                 radiation_problems += 1  # Problema de radiación (radiation_suits)
 
-        # Contar problemas en aristas (excluyendo la última arista)
-        for i in range(len(best_path) - 2):  # Excluir la última arista
+        # Contar problemas en aristas
+        for i in range(len(best_path) - 1):
             u = best_path[i]
             v = best_path[i + 1]
             edge = tuple(sorted([u, v]))
             edge_data = proxy_data.edge_data.get(edge, {})
             
-            # Determinar si la arista tiene algún problema (solo uno por arista)
+            # Determinar si la arista tiene algún problema
             has_blockage = edge_data.get("debris_density", 0) >= BLOCKAGE_THRESHOLD
             
             if has_blockage:
-                explosives_problems += 1  # Problema de bloqueo o daño estructural (explosives)
+                explosives_problems += 1  # Problema de bloqueo (explosives)
 
         # Asignar recursos en función de los problemas
         resources = {
-            'radiation_suits': radiation_problems,  # 1 por problema de radiación
-            'ammo': thermal_problems,               # 1 por problema de thermal
-            'explosives': explosives_problems       # 1 por problema sísmico, de bloqueo o de daño estructural
+            'radiation_suits': radiation_problems,
+            'ammo': thermal_problems,
+            'explosives': explosives_problems
         }
         
         # Calcular el total de recursos asignados
@@ -190,14 +210,24 @@ def main():
                 resources['ammo'] += 1
 
         return PolicyResult(best_path, resources)
-
+    
+    # Tiempo de inicio
+    start_time = time.time()
+    
+    print(f"Iniciando búsqueda de Monte Carlo con {n_iterations} iteraciones...")
+    print(f"Realizando {config['n_runs']} simulaciones por iteración.")
+    print(f"Valores base: THERMAL={BASE_THERMAL_THRESHOLD}, "
+          f"RADIATION={BASE_RADIATION_THRESHOLD}, BLOCKAGE={BASE_BLOCKAGE_THRESHOLD}")
+    print(f"Rango de variación: ±{offset_range}")
+    print(f"Se han generado {len(all_thresholds)} combinaciones únicas de umbrales.")
+    print("-" * 80)
+    
     # Realizar Monte Carlo Search
-    for i in range(n_iterations):
-        # Generar umbrales aleatorios
-        thresholds = generate_random_thresholds()
+    for i in range(min(n_iterations, len(all_thresholds))):
+        iteration_start = time.time()
         
-        # Actualizar los umbrales en la política
-        best_thresholds = thresholds
+        # Usar la combinación pre-generada
+        current_thresholds = all_thresholds[i]
         
         # Asignar la política personalizada
         policy._policy_4 = custom_policy_4
@@ -207,23 +237,110 @@ def main():
         
         # Obtener resultados
         success_rate = results['core_metrics']['overall_performance']['success_rate']
+        avg_time = results['core_metrics']['overall_performance']['avg_time']
+        
+        # Guardar resultados para análisis
+        result_data = {
+            'iteration': i,
+            'thresholds': current_thresholds.copy(),
+            'success_rate': success_rate,
+            'avg_time': avg_time,
+            'experiment_id': experiment_id
+        }
+        results_history.append(result_data)
+        
+        # Calcular tiempo transcurrido
+        iteration_time = time.time() - iteration_start
+        elapsed = time.time() - start_time
+        remaining = (elapsed / (i+1)) * (n_iterations - i - 1) if i > 0 else 0
         
         # Imprimir resultados de esta iteración
-        print(f"Iteration {i}: Success rate: {success_rate} with thresholds: {thresholds}")
+        print(f"Iteración {i+1}/{min(n_iterations, len(all_thresholds))} | Éxito: {success_rate*100:.1f}% | " 
+              f"Umbrales: T={current_thresholds['THERMAL_THRESHOLD']}, "
+              f"R={current_thresholds['RADIATION_THRESHOLD']}, "
+              f"B={current_thresholds['BLOCKAGE_THRESHOLD']} | "
+              f"Tiempo iter: {iteration_time:.1f}s | "
+              f"Restante: {remaining//60:.0f}m {remaining%60:.0f}s")
         
         # Actualizar mejor resultado si es necesario
         if success_rate > best_success_rate:
             best_success_rate = success_rate
-            best_thresholds = {k: v for k, v in thresholds.items()}
+            best_thresholds = {k: v for k, v in current_thresholds.items()}
+            print(f"¡NUEVO MEJOR! Éxito: {best_success_rate*100:.1f}% | Umbrales: {best_thresholds}")
     
     # Restaurar el método original
     policy._policy_4 = original_policy_4
     
+    # Tiempo total
+    total_time = time.time() - start_time
+    hours = int(total_time // 3600)
+    minutes = int((total_time % 3600) // 60)
+    seconds = int(total_time % 60)
+    
     # Resultados finales
-    print("\n--- Monte Carlo Search Results ---")
-    print(f"Best Success Rate: {best_success_rate * 100:.1f}%")
-    print(f"Best Thresholds: {best_thresholds}")
-    print(f"Found in {n_iterations} iterations")
+    print("\n" + "=" * 80)
+    print(f"RESULTADOS DE BÚSQUEDA DE MONTE CARLO (Tiempo total: {hours}h {minutes}m {seconds}s)")
+    print("=" * 80)
+    print(f"Mejor tasa de éxito: {best_success_rate * 100:.2f}%")
+    print(f"Mejores umbrales encontrados:")
+    print(f"  - THERMAL_THRESHOLD: {best_thresholds['THERMAL_THRESHOLD']}")
+    print(f"  - RADIATION_THRESHOLD: {best_thresholds['RADIATION_THRESHOLD']}")
+    print(f"  - BLOCKAGE_THRESHOLD: {best_thresholds['BLOCKAGE_THRESHOLD']}")
+    print("=" * 80)
+    
+    # Guardar resultados en un archivo
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    results_dir = "monte_carlo_results"
+    os.makedirs(results_dir, exist_ok=True)
+    results_file = os.path.join(results_dir, f"mc_search_results_{timestamp}.json")
+    
+    with open(results_file, 'w') as f:
+        json.dump({
+            'best_success_rate': best_success_rate,
+            'best_thresholds': best_thresholds,
+            'total_iterations': min(n_iterations, len(all_thresholds)),
+            'total_time_seconds': total_time,
+            'results_history': results_history,
+            'config': config
+        }, f, indent=2)
+    
+    print(f"Resultados guardados en: {results_file}")
+    
+    # Visualizar los mejores 5 resultados
+    top_results = sorted(results_history, key=lambda x: x['success_rate'], reverse=True)[:5]
+    print("\nTop 5 mejores combinaciones:")
+    for i, result in enumerate(top_results):
+        print(f"{i+1}. Éxito: {result['success_rate']*100:.2f}% | "
+              f"T={result['thresholds']['THERMAL_THRESHOLD']}, "
+              f"R={result['thresholds']['RADIATION_THRESHOLD']}, "
+              f"B={result['thresholds']['BLOCKAGE_THRESHOLD']} | "
+              f"Experimento: {result['experiment_id']}")
+    
+    return {
+        'best_success_rate': best_success_rate,
+        'best_thresholds': best_thresholds,
+        'results_history': results_history
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description='Monte Carlo Tree Search para optimizar umbrales de evacuación')
+    parser.add_argument('--iterations', type=int, default=100, 
+                        help='Número de iteraciones de Monte Carlo (default: 100)')
+    parser.add_argument('--runs', type=int, default=100,
+                        help='Número de simulaciones por iteración (default: 100)')
+    parser.add_argument('--seed', type=int, default=7354681,
+                        help='Semilla para reproducibilidad (default: 7354681)')
+    parser.add_argument('--offset-range', type=float, default=0.1,
+                        help='Rango de offset para los umbrales (default: 0.1)')
+    
+    args = parser.parse_args()
+    
+    run_monte_carlo_search(
+        n_iterations=args.iterations,
+        n_runs=args.runs,
+        base_seed=args.seed,
+        offset_range=args.offset_range
+    )
 
 if __name__ == "__main__":
     main()
