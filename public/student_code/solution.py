@@ -1,6 +1,6 @@
 import networkx as nx
 from typing import Dict, List, Literal
-
+import pandas as pd
 from public.lib.interfaces import CityGraph, ProxyData, PolicyResult
 from public.student_code.convert_to_df import convert_edge_data_to_df, convert_node_data_to_df
 
@@ -58,7 +58,7 @@ class EvacuationPolicy:
         # print(f'Max Resources: {max_resources} \n \n')
         
         
-        self.policy_type = "policy_3" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
+        self.policy_type = "policy_4" # TODO: Cambiar a "policy_2" para probar la política 2, y asi sucesivamente
         
         if self.policy_type == "policy_1":
             return self._policy_1(city, proxy_data, max_resources)
@@ -71,401 +71,183 @@ class EvacuationPolicy:
     
     def _policy_1(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política optimizada basada en correlaciones con éxito de misión.
-        
-        Esta política:
-        - Utiliza las correlaciones directas con el éxito de la misión para determinar pesos
-        - Evita los factores con correlación negativa alta (seismic_activity, structural_damage, debris_density)
-        - Favorece rutas que pasan por nodos con factores de correlación positiva (structural_integrity, signal_strength)
-        - Asigna pesos de manera proporcional al impacto real de cada factor
+        Política que busca un camino desde el nodo inicial hasta un nodo de extracción,
+        asegurando que todos los nodos en el camino tengan una actividad sísmica por debajo de un umbral.
+        Si no encuentra un camino válido, incrementa gradualmente el umbral hasta encontrar uno.
         """
-        # Construimos un nuevo grafo con pesos personalizados
-        weighted_graph = city.graph.copy()
-        
-        # CORRELACIONES CON ÉXITO DE MISIÓN (extraídas del análisis de impacto ambiental)
-        factor_correlations = {
-            # Factores de nodo
-            "node": {
-                "seismic_activity": -0.26,       # Alta correlación negativa
-                "structural_integrity": 0.25,    # Alta correlación positiva
-                "signal_strength": 0.21,         # Alta correlación positiva
-                "population_density": 0.06,      # Baja correlación positiva
-                "radiation_readings": 0.04,      # Baja correlación positiva
-                "thermal_readings": 0.03,        # Baja correlación positiva
-                "emergency_calls": -0.03         # Baja correlación negativa
-            },
-            # Factores de arista
-            "edge": {
-                "structural_damage": -0.22,      # Alta correlación negativa
-                "debris_density": -0.20,         # Alta correlación negativa
-                "hazard_gradient": 0.08,         # Baja correlación positiva
-                "signal_interference": -0.07,    # Baja correlación negativa
-                "movement_sightings": -0.02      # Baja correlación negativa
-            }
-        }
-        
-        # MULTIPLICADORES BASE
-        BASE_MULTIPLIER = 20.0  # Multiplicador base para escalar las correlaciones
-        
-        # Función para convertir correlaciones en penalizaciones o bonificaciones
-        def correlation_to_weight(correlation):
-            # Si la correlación es negativa, penalizamos (mayor peso = peor)
-            # Si la correlación es positiva, bonificamos (menor peso = mejor)
-            # Usamos el valor absoluto para la magnitud y el signo para la dirección
-            return -correlation * BASE_MULTIPLIER
-        
-        # Aplicamos pesos a las aristas basados en correlaciones
-        for u, v, data in weighted_graph.edges(data=True):
-            edge_key = f"{u}_{v}"
-            base_weight = data.get('weight', 1)
-            weight_adjustment = 0
-            
-            if edge_key in proxy_data.edge_data:
-                # Calculamos ajustes basados en cada factor de arista
-                for factor, correlation in factor_correlations["edge"].items():
-                    if factor in proxy_data.edge_data[edge_key]:
-                        factor_value = proxy_data.edge_data[edge_key][factor]
-                        # El ajuste es proporcional al valor del factor y su correlación con el éxito
-                        adjustment = factor_value * correlation_to_weight(correlation)
-                        weight_adjustment += adjustment
-                
-                # Nunca permitir pesos negativos (que incentivarían un camino)
-                new_weight = max(0.1, base_weight + weight_adjustment)
-                weighted_graph[u][v]['weight'] = new_weight
-        
-        # Aplicamos influencia de nodos en las aristas conectadas
-        for node in weighted_graph.nodes():
-            node_key = str(node)
-            
-            if node_key in proxy_data.node_data:
-                node_adjustment = 0
-                
-                # Calculamos el ajuste total para este nodo
-                for factor, correlation in factor_correlations["node"].items():
-                    if factor in proxy_data.node_data[node_key]:
-                        factor_value = proxy_data.node_data[node_key][factor]
-                        # Aplicamos un ajuste basado en la correlación
-                        adjustment = factor_value * correlation_to_weight(correlation)
-                        
-                        # Para los factores altamente correlacionados, aplicamos una función exponencial
-                        if abs(correlation) >= 0.2:  # Factores con alto impacto
-                            if correlation < 0:  # Correlación negativa (seismic_activity)
-                                adjustment = adjustment * (1 + factor_value)  # Penalización progresiva
-                            else:  # Correlación positiva (structural_integrity, signal_strength)
-                                adjustment = adjustment * (1 - 0.5 * factor_value)  # Bonificación atenuada
-                        
-                        node_adjustment += adjustment
-                
-                # Aplicamos el ajuste del nodo a todas sus aristas conectadas
-                for neighbor in weighted_graph.neighbors(node):
-                    if weighted_graph.has_edge(node, neighbor):
-                        current_weight = weighted_graph[node][neighbor]['weight']
-                        # Aseguramos que no creemos pesos negativos
-                        weighted_graph[node][neighbor]['weight'] = max(0.1, current_weight + node_adjustment)
-                
-                # También aplicamos a aristas entrantes
-                for pred in weighted_graph.predecessors(node):
-                    if weighted_graph.has_edge(pred, node):
-                        current_weight = weighted_graph[pred][node]['weight']
-                        weighted_graph[pred][node]['weight'] = max(0.1, current_weight + node_adjustment)
-        
-        # PASO ADICIONAL: Multiplicador extremo para actividad sísmica
-        # Como sabemos que este factor es particularmente problemático
-        SEISMIC_OVERRIDE_THRESHOLD = 0.6  # Umbral a partir del cual amplificamos extremadamente
-        SEISMIC_EXTREME_MULTIPLIER = 1000.0  # Multiplicador extremo para evitar zonas de alta sismicidad
-        
-        for node in weighted_graph.nodes():
-            node_key = str(node)
-            if node_key in proxy_data.node_data:
-                if "seismic_activity" in proxy_data.node_data[node_key]:
-                    seismic_value = proxy_data.node_data[node_key]["seismic_activity"]
-                    
-                    # Si la actividad sísmica supera el umbral, aplicamos una penalización extrema
-                    if seismic_value > SEISMIC_OVERRIDE_THRESHOLD:
-                        extreme_penalty = seismic_value * SEISMIC_EXTREME_MULTIPLIER
-                        
-                        # Aplicamos a todas las aristas conectadas
-                        for neighbor in weighted_graph.neighbors(node):
-                            if weighted_graph.has_edge(node, neighbor):
-                                weighted_graph[node][neighbor]['weight'] += extreme_penalty
-                        
-                        for pred in weighted_graph.predecessors(node):
-                            if weighted_graph.has_edge(pred, node):
-                                weighted_graph[pred][node]['weight'] += extreme_penalty
-        
-        # Encontramos el camino más corto optimizado según correlaciones
-        extraction_targets = city.extraction_nodes
+        # Umbral inicial de actividad sísmica
+        initial_threshold = 0.3
+        threshold_increment = 0.05  # Incremento del umbral si no se encuentra un camino
+        max_threshold = 0.5  # Umbral máximo permitido
+
+        # Función para verificar si un camino cumple con el umbral de actividad sísmica
+        def is_path_valid(path):
+            for node in path:
+                node_key = str(node)
+                if node_key in proxy_data.node_data:
+                    seismic_activity = proxy_data.node_data[node_key].get("seismic_activity", 0)
+                    if seismic_activity > current_threshold:
+                        return False
+            return True
+
+        # Buscamos el camino válido con el umbral más bajo posible
+        current_threshold = initial_threshold
         best_path = None
-        best_path_cost = float('inf')
-        
-        for target in extraction_targets:
-            try:
-                path = nx.shortest_path(weighted_graph, city.starting_node, target, weight='weight')
-                path_cost = nx.path_weight(weighted_graph, path, weight='weight')
-                
-                if path_cost < best_path_cost:
-                    best_path = path
-                    best_path_cost = path_cost
-            except nx.NetworkXNoPath:
-                continue
-        
+
+        while current_threshold <= max_threshold:
+            # Filtramos el grafo para incluir solo nodos con actividad sísmica por debajo del umbral actual
+            filtered_graph = city.graph.copy()
+            nodes_to_remove = [
+                node for node in filtered_graph.nodes()
+                if str(node) in proxy_data.node_data and proxy_data.node_data[str(node)].get("seismic_activity", 0) > current_threshold
+            ]
+            filtered_graph.remove_nodes_from(nodes_to_remove)
+
+            # Buscamos el camino más corto en el grafo filtrado
+            for target in city.extraction_nodes:
+                try:
+                    path = nx.shortest_path(filtered_graph, city.starting_node, target)
+                    if is_path_valid(path):  # Verificamos que el camino cumpla con el umbral
+                        best_path = path
+                        break
+                except nx.NetworkXNoPath:
+                    continue
+
+            # Si encontramos un camino válido, salimos del bucle
+            if best_path is not None:
+                break
+
+            # Si no encontramos un camino, incrementamos el umbral
+            current_threshold += threshold_increment
+
         # Si no encontramos ningún camino, nos quedamos en el nodo inicial
         if best_path is None:
             best_path = [city.starting_node]
-        
-        # Distribución de recursos basada en proporciones relativas
-        # Mantenemos la distribución original
-        radiation_proportion = 0.45
-        ammo_proportion = 0.35
-        explosives_proportion = 0.20
-        
+
+        # Distribución de recursos (puedes ajustar esto según tus necesidades)
         resources = {
-            'radiation_suits': int(max_resources * radiation_proportion),
-            'ammo': int(max_resources * ammo_proportion),
-            'explosives': int(max_resources * explosives_proportion)
+            'radiation_suits': int(max_resources * 0.45),
+            'ammo': int(max_resources * 0.35),
+            'explosives': int(max_resources * 0.20)
         }
-        
+
         # Ajustamos para asegurar que sumamos exactamente max_resources
         adjustment = max_resources - sum(resources.values())
         if adjustment > 0:
             resources['radiation_suits'] += adjustment
-        
+
         return PolicyResult(best_path, resources)
     def _policy_2(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política 1: Estrategia optimizada para evitar nodos con alta actividad sísmica y daño estructural.
-        Encuentra un camino que prioriza especialmente evitar nodos con alta actividad sísmica y
-        aristas con alto daño estructural, considerando también otros factores secundarios.
+        Política que selecciona rutas donde los factores negativos (sísmicos, escombros, daño estructural)
+        están por debajo de la media de la ciudad.
         
         Esta política:
-        - Penaliza MUY fuertemente nodos con alta actividad sísmica (factor crítico principal)
-        - Penaliza MUY fuertemente aristas con alto daño estructural (factor crítico principal)
-        - Penaliza moderadamente otros factores como debris_density, signal_interference, etc.
-        - Encuentra la ruta más segura priorizando los factores más impactantes
-        - Distribución de recursos optimizada
+        - Calcula la media de los factores negativos en toda la ciudad
+        - Penaliza fuertemente las rutas que superan estos valores medios
+        - Mantiene la distribución fija de recursos
         """
-        # Construimos un nuevo grafo con pesos personalizados
+        # Verificamos si es posible llegar a alguno de los puntos de extracción
+        reachable_targets = []
+        for target in city.extraction_nodes:
+            try:
+                path = nx.shortest_path(city.graph, city.starting_node, target)
+                reachable_targets.append(target)
+            except nx.NetworkXNoPath:
+                continue
+        
+        # Si no podemos llegar a ningún punto de extracción, devolvemos camino vacío
+        if not reachable_targets:
+            return PolicyResult([city.starting_node], {
+                'radiation_suits': 0,
+                'ammo': 0,
+                'explosives': 0
+            })
+        
+        # Calculamos las medias de los factores negativos en la ciudad
+        # Factores negativos a considerar
+        negative_factors = {
+            "node": ["seismic_activity"],
+            "edge": ["structural_damage", "debris_density"]
+        }
+        
+        # Calculamos medias para nodos
+        node_averages = {}
+        for factor in negative_factors["node"]:
+            values = []
+            for node, data in proxy_data.node_data.items():
+                if factor in data:
+                    values.append(data[factor])
+            if values:
+                node_averages[factor] = sum(values) / len(values)
+            else:
+                node_averages[factor] = 0
+        
+        # Calculamos medias para aristas
+        edge_averages = {}
+        for factor in negative_factors["edge"]:
+            values = []
+            for edge_key, data in proxy_data.edge_data.items():
+                if factor in data:
+                    values.append(data[factor])
+            if values:
+                edge_averages[factor] = sum(values) / len(values)
+            else:
+                edge_averages[factor] = 0
+        
+        # Creamos un grafo ponderado para la búsqueda de rutas
         weighted_graph = city.graph.copy()
         
-        # PRIORIZACIÓN DE FACTORES
-        # Factores críticos primarios (máxima prioridad)
-        primary_critical_factors = {
-            "node": ["seismic_activity"],       # Actividad sísmica en nodos
-            "edge": ["structural_damage"]       # Daño estructural en aristas
-        }
-        
-        # Factores críticos secundarios (alta prioridad)
-        secondary_critical_factors = {
-            "node": [],
-            "edge": ["debris_density"]          # Densidad de escombros en aristas
-        }
-        
-        # Factores terciarios (prioridad media)
-        tertiary_factors = {
-            "node": ["population_density"],
-            "edge": ["signal_interference", "movement_sightings"]
-        }
-        
-        # Factores cuaternarios (prioridad baja)
-        quaternary_factors = {
-            "node": [],
-            "edge": ["hazard_gradient"]
-        }
-        
-        # MULTIPLICADORES DE PENALIZACIÓN (ajustados para dar mucho mayor peso a los factores principales)
-        PRIMARY_CRITICAL_MULTIPLIER = 100.0      # Penalización extremadamente alta
-        SECONDARY_CRITICAL_MULTIPLIER = 10.0     # Penalización muy alta
-        TERTIARY_MULTIPLIER = 5.0               # Penalización moderada
-        QUATERNARY_MULTIPLIER = 1             # Penalización baja
-        
-        # Función para aplicar una penalización exponencial más agresiva a los factores críticos
-        def penalize_critical_factor(value):
-            # Penalización exponencial cúbica para factores críticos primarios
-            return value ** 3
-        
-        def penalize_secondary_factor(value):
-            # Penalización exponencial cuadrática para factores críticos secundarios
-            return value ** 2
-        
-        # Asignamos pesos personalizados a las aristas
+        # Asignamos pesos - penalizando fuertemente valores por encima de la media
         for u, v, data in weighted_graph.edges(data=True):
             edge_key = f"{u}_{v}"
             base_weight = data.get('weight', 1)
-            additional_weight = 0
+            weight_modifier = 1.0
             
+            # Procesamos datos de aristas
             if edge_key in proxy_data.edge_data:
-                # Aplicamos penalización extrema para factores críticos primarios
-                for factor in primary_critical_factors["edge"]:
-                    factor_value = proxy_data.edge_data[edge_key].get(factor, 0)
-                    # Penalización exponencial cúbica para factores primarios
-                    additional_weight += penalize_critical_factor(factor_value) * PRIMARY_CRITICAL_MULTIPLIER
+                edge_data = proxy_data.edge_data[edge_key]
                 
-                # Aplicamos penalización muy alta para factores críticos secundarios
-                for factor in secondary_critical_factors["edge"]:
-                    factor_value = proxy_data.edge_data[edge_key].get(factor, 0)
-                    # Penalización exponencial cuadrática
-                    additional_weight += penalize_secondary_factor(factor_value) * SECONDARY_CRITICAL_MULTIPLIER
-                
-                # Aplicamos penalización moderada para factores terciarios
-                for factor in tertiary_factors["edge"]:
-                    factor_value = proxy_data.edge_data[edge_key].get(factor, 0)
-                    additional_weight += factor_value * TERTIARY_MULTIPLIER
-                
-                # Aplicamos penalización baja para factores cuaternarios
-                for factor in quaternary_factors["edge"]:
-                    factor_value = proxy_data.edge_data[edge_key].get(factor, 0)
-                    additional_weight += factor_value * QUATERNARY_MULTIPLIER
+                for factor in negative_factors["edge"]:
+                    if factor in edge_data:
+                        # Si el factor está por encima de la media, lo penalizamos mucho
+                        if edge_data[factor] > edge_averages[factor]:
+                            weight_modifier += 5.0 * (edge_data[factor] - edge_averages[factor])
+                        # Si está por debajo, lo favorecemos ligeramente
+                        else:
+                            weight_modifier += 0.5 * (edge_data[factor] - edge_averages[factor])
+            
+            # Procesamos datos de nodos para ambos extremos
+            for node in [u, v]:
+                if node in proxy_data.node_data:
+                    node_data = proxy_data.node_data[node]
                     
-                # Actualizamos el peso de la arista
-                weighted_graph[u][v]['weight'] = base_weight * (1 + additional_weight)
-        
-        # Añadimos penalizaciones a los nodos según los factores priorizados
-        for node in weighted_graph.nodes():
-            node_key = str(node)
+                    for factor in negative_factors["node"]:
+                        if factor in node_data:
+                            # Si el factor está por encima de la media, lo penalizamos mucho
+                            if node_data[factor] > node_averages[factor]:
+                                weight_modifier += 5.0 * (node_data[factor] - node_averages[factor]) / 2
+                            # Si está por debajo, lo favorecemos ligeramente
+                            else:
+                                weight_modifier += 0.5 * (node_data[factor] - node_averages[factor]) / 2
             
-            if node_key in proxy_data.node_data:
-                node_penalty = 0
-                
-                # Penalización extrema para factores críticos primarios de nodos
-                for factor in primary_critical_factors["node"]:
-                    factor_value = proxy_data.node_data[node_key].get(factor, 0)
-                    # Penalización exponencial cúbica
-                    node_penalty += penalize_critical_factor(factor_value) * PRIMARY_CRITICAL_MULTIPLIER
-                
-                # Penalización para factores críticos secundarios de nodos
-                for factor in secondary_critical_factors["node"]:
-                    factor_value = proxy_data.node_data[node_key].get(factor, 0)
-                    # Penalización exponencial cuadrática
-                    node_penalty += penalize_secondary_factor(factor_value) * SECONDARY_CRITICAL_MULTIPLIER
-                
-                # Penalización para factores terciarios de nodos
-                for factor in tertiary_factors["node"]:
-                    factor_value = proxy_data.node_data[node_key].get(factor, 0)
-                    node_penalty += factor_value * TERTIARY_MULTIPLIER
-                
-                # Penalización para factores cuaternarios de nodos
-                for factor in quaternary_factors["node"]:
-                    factor_value = proxy_data.node_data[node_key].get(factor, 0)
-                    node_penalty += factor_value * QUATERNARY_MULTIPLIER
-                
-                # Si el nodo tiene penalización, la aplicamos a todas sus aristas
-                if node_penalty > 0:
-                    for neighbor in weighted_graph.neighbors(node):
-                        if weighted_graph.has_edge(node, neighbor):
-                            weighted_graph[node][neighbor]['weight'] += node_penalty * base_weight
-                            
-                    # También penalizamos aristas entrantes
-                    for pred in weighted_graph.predecessors(node):
-                        if weighted_graph.has_edge(pred, node):
-                            weighted_graph[pred][node]['weight'] += node_penalty * base_weight
+            # Aseguramos que el peso sea siempre positivo
+            new_weight = base_weight * max(0.01, weight_modifier)
+            weighted_graph[u][v]['weight'] = new_weight
         
-        # Encontramos el camino más corto (que ahora representa el camino con menor riesgo según priorización)
-        extraction_targets = city.extraction_nodes
+        # Encontramos el camino óptimo (con menor peso acumulado)
         best_path = None
         best_path_cost = float('inf')
         
-        for target in extraction_targets:
-            try:
-                path = nx.shortest_path(weighted_graph, city.starting_node, target, weight='weight')
-                path_cost = nx.path_weight(weighted_graph, path, weight='weight')
-                
-                if path_cost < best_path_cost:
-                    best_path = path
-                    best_path_cost = path_cost
-            except nx.NetworkXNoPath:
-                continue
-        
-        # Si no encontramos ningún camino, nos quedamos en el nodo inicial
-        if best_path is None:
-            best_path = [city.starting_node]
-        
-        # Distribución de recursos basada en proporciones relativas
-        # Trajes de radiación (45%), munición (35%), explosivos (20%)
-        radiation_proportion = 0.45
-        ammo_proportion = 0.35
-        explosives_proportion = 0.20
-        
-        resources = {
-            'radiation_suits': int(max_resources * radiation_proportion),
-            'ammo': int(max_resources * ammo_proportion),
-            'explosives': int(max_resources * explosives_proportion)
-        }
-        
-        # Ajustamos para asegurar que sumamos exactamente max_resources
-        adjustment = max_resources - sum(resources.values())
-        
-        # Si hay ajuste necesario, lo asignamos prioritariamente a trajes de radiación
-        if adjustment > 0:
-            resources['radiation_suits'] += adjustment
-        
-        return PolicyResult(best_path, resources)
-    def _policy_3(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
-        """
-        Política optimizada para minimizar daño estructural y actividad sísmica.
-        """
-        weighted_graph = city.graph.copy()
-        
-        factor_correlations = {
-            "node": {
-                "seismic_activity": -1.0,  # Penalización máxima para evitar zonas sísmicas
-                "structural_integrity": 0.25,
-                "signal_strength": 0.21
-            },
-            "edge": {
-                "structural_damage": -1.0,  # Penalización máxima para evitar daño estructural
-                "debris_density": -0.20
-            }
-        }
-        
-        BASE_MULTIPLIER = 100.0  # Aumento del impacto de los factores clave
-        
-        def correlation_to_weight(correlation):
-            return -correlation * BASE_MULTIPLIER
-        
-        for u, v, data in weighted_graph.edges(data=True):
-            base_weight = data.get('weight', 1)
-            weight_adjustment = 0
+        for target in reachable_targets:
+            path = nx.shortest_path(weighted_graph, city.starting_node, target, weight='weight')
+            path_cost = nx.path_weight(weighted_graph, path, weight='weight')
             
-            for factor, correlation in factor_correlations["edge"].items():
-                if factor in proxy_data.edge_data.get(f"{u}_{v}", {}):
-                    factor_value = proxy_data.edge_data[f"{u}_{v}"][factor]
-                    weight_adjustment += factor_value * correlation_to_weight(correlation)
-            
-            weighted_graph[u][v]['weight'] = max(0.1, base_weight + weight_adjustment)
+            if path_cost < best_path_cost:
+                best_path = path
+                best_path_cost = path_cost
         
-        for node in weighted_graph.nodes():
-            node_key = str(node)
-            node_adjustment = 0
-            
-            for factor, correlation in factor_correlations["node"].items():
-                if factor in proxy_data.node_data.get(node_key, {}):
-                    factor_value = proxy_data.node_data[node_key][factor]
-                    adjustment = factor_value * correlation_to_weight(correlation)
-                    if correlation < -0.5:
-                        adjustment *= (1 + factor_value)
-                    node_adjustment += adjustment
-            
-            for neighbor in weighted_graph.neighbors(node):
-                if weighted_graph.has_edge(node, neighbor):
-                    weighted_graph[node][neighbor]['weight'] = max(0.1, weighted_graph[node][neighbor]['weight'] + node_adjustment)
-        
-        extraction_targets = city.extraction_nodes
-        best_path = None
-        best_path_cost = float('inf')
-        
-        for target in extraction_targets:
-            try:
-                path = nx.shortest_path(weighted_graph, city.starting_node, target, weight='weight')
-                path_cost = nx.path_weight(weighted_graph, path, weight='weight')
-                if path_cost < best_path_cost:
-                    best_path = path
-                    best_path_cost = path_cost
-            except nx.NetworkXNoPath:
-                continue
-        
-        if best_path is None:
-            best_path = [city.starting_node]
-        
+        # Usamos la distribución fija de recursos como se especificó
         resources = {
             'radiation_suits': int(max_resources * 0.45),
             'ammo': int(max_resources * 0.393),
@@ -473,38 +255,315 @@ class EvacuationPolicy:
         }
         
         return PolicyResult(best_path, resources)
-
-    def _policy_4(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
+    def _policy_3(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
-        Política 4: Estrategia personalizada.
-        Implementa tu mejor estrategia usando cualquier recurso disponible.
+        Política 4: Estrategia invertida basada en análisis de proxies.
         
-        Esta política puede:
-        - Usar cualquier técnica o recurso que consideres apropiado
-        - Implementar estrategias avanzadas de tu elección
+        - Interpretación INVERSA de las correlaciones de proxies
+        - Selección de caminos basada en criterios opuestos a los anteriores
+        - Asignación de recursos enfocada en las necesidades más críticas
         """
-        # TODO: Implementa tu solución aquí
-        proxy_data_nodes_df = convert_node_data_to_df(proxy_data.node_data)
-        proxy_data_edges_df = convert_edge_data_to_df(proxy_data.edge_data)
+        # Copia del grafo para modificar
+        G = city.graph.copy()
         
-        #print(f'\n Node Data: \n {proxy_data_nodes_df}')
-        #print(f'\n Edge Data: \n {proxy_data_edges_df}')
-        
-        target = city.extraction_nodes[0]
-        
-        try:
-            path = nx.shortest_path(city.graph, city.starting_node, target, 
-                                  weight='weight')
-        except nx.NetworkXNoPath:
-            path = [city.starting_node]
-            
-        resources = {
-            'explosives': max_resources // 3,
-            'ammo': max_resources // 3,
-            'radiation_suits': max_resources // 3
+        # INTERPRETACIÓN INVERSA de correlaciones - asumimos lo opuesto
+        # Tratamos correlaciones positivas como negativas y viceversa
+        node_correlations = {
+            'thermal_readings': -0.84,      # Invertimos: ahora es muy negativo
+            'population_density': -0.65,    # Invertimos: ahora es negativo
+            'signal_strength': -0.02,       # Invertimos: neutro/ligeramente negativo
+            'structural_integrity': -0.03,  # Invertimos: neutro/ligeramente negativo
+            'radiation_readings': 0.10,     # Invertimos: ahora es positivo
+            'emergency_calls': 0.08,        # Invertimos: ahora es positivo
+            'seismic_activity': 2        # Invertimos: neutro/ligeramente positivo
         }
         
-        return PolicyResult(path, resources)
+        edge_correlations = {
+            'movement_sightings': -0.30,    # Invertimos: ahora es negativo
+            'hazard_gradient': -0.30,       # Invertimos: ahora es negativo
+            'structural_damage': -0.12,     # Invertimos: ahora es ligeramente negativo
+            'debris_density': -0.11,        # Invertimos: ahora es ligeramente negativo
+            'signal_interference': 0.10     # Invertimos: ahora es positivo
+        }
+        
+        # Modificar pesos de aristas con interpretación invertida
+        for u, v in G.edges():
+            edge = tuple(sorted([u, v]))
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            base_weight = G[u][v]['weight']
+            
+            # INTERPRETACIÓN INVERTIDA: Valoramos lo que antes considerábamos negativo
+            edge_score = 1.0
+            
+            # Factores de riesgo básicos - mantenemos estos como estaban
+            structural_risk = 1.0 + (edge_data.get('structural_damage', 0) * 2.0)
+            
+            # Calculamos el peso ajustado con la interpretación INVERTIDA
+            adjusted_weight = base_weight * structural_risk
+            
+            G[u][v]['adjusted_weight'] = adjusted_weight
+            G[u][v]['structural_damage'] = edge_data.get('structural_damage', 0)
+        
+        # Evaluación de riesgo para nodos - versión de la política original exitosa
+        node_dangers = {}
+        node_resource_needs = {}
+        
+        for node in G.nodes():
+            node_data = proxy_data.node_data.get(node, {})
+            
+            # VERSIÓN ORIGINAL que funcionó: thermal_readings y radiation son peligros
+            thermal_danger = node_data.get('thermal_readings', 0) * 3.0
+            radiation_danger = node_data.get('radiation_readings', 0) * 1.0
+            seismic_danger = node_data.get('seismic_activity', 0) * 5.0
+            
+            # Peligro total del nodo - ENFOQUE ORIGINAL
+            node_dangers[node] = thermal_danger + radiation_danger + seismic_danger
+            
+            # Necesidades de recursos - ENFOQUE ORIGINAL
+            needs = {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+            
+            # Necesidad de trajes de radiación
+            if node_data.get('radiation_readings', 0) > 0.2:
+                needs['radiation_suits'] = 1
+                
+            # Necesidad de munición para zombies
+            if node_data.get('thermal_readings', 0) > 0.2:
+                needs['ammo'] = 1
+                
+            node_resource_needs[node] = needs
+        
+        # Verificar si hay camino válido a algún nodo de extracción
+        valid_path_exists = False
+        for target in city.extraction_nodes:
+            try:
+                test_path = nx.shortest_path(G, city.starting_node, target)
+                valid_path_exists = True
+                break
+            except nx.NetworkXNoPath:
+                continue
+        
+        # Si no hay camino válido, devolver recursos 0
+        if not valid_path_exists:
+            zero_resources = {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+            return PolicyResult([city.starting_node], zero_resources)
+        
+        # Buscar caminos a todos los nodos de extracción
+        all_paths = []
+        
+        for target in city.extraction_nodes:
+            try:
+                # Encontrar el camino más corto considerando los peligros - ENFOQUE ORIGINAL
+                path = nx.shortest_path(G, city.starting_node, target, weight='adjusted_weight')
+                
+                # Calcular estadísticas del camino - ENFOQUE ORIGINAL
+                danger_score = sum(node_dangers.get(node, 0) for node in path)
+                path_length = sum(G[path[i]][path[i+1]]['weight'] for i in range(len(path)-1))
+                
+                # Calcular recursos necesarios - ENFOQUE ORIGINAL
+                path_resources = {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+                
+                # Recursos para nodos
+                for node in path:
+                    node_needs = node_resource_needs[node]
+                    for res_type, amount in node_needs.items():
+                        path_resources[res_type] += amount
+                
+                # Recursos para aristas (principalmente explosivos)
+                for i in range(len(path)-1):
+                    edge = tuple(sorted([path[i], path[i+1]]))
+                    edge_data = proxy_data.edge_data.get(edge, {})
+                    
+                    # Necesidad de explosivos para obstáculos
+                    if edge_data.get('structural_damage', 0) > 0.3:
+                        path_resources['explosives'] += 1
+                
+                all_paths.append({
+                    'path': path,
+                    'danger': danger_score,
+                    'length': path_length,
+                    'resources': path_resources
+                })
+            except nx.NetworkXNoPath:
+                continue
+        
+        # Si no hay caminos viables, devolver nodo inicial
+        if not all_paths:
+            resources = {
+                'explosives': max_resources // 5,             # 20%
+                'ammo': max_resources * 2 // 5,               # 40%
+                'radiation_suits': max_resources * 2 // 5     # 40%
+            }
+            return PolicyResult([city.starting_node], resources)
+        
+        # Ordenar caminos por menor peligro - VERSIÓN ORIGINAL EXITOSA
+        all_paths.sort(key=lambda x: x['danger'])
+        
+        # Elegir el camino más seguro (menor peligro) - VERSIÓN ORIGINAL EXITOSA
+        safest_path = all_paths[0]['path']
+        needed_resources = all_paths[0]['resources']
+        
+        # Calcular recursos totales necesarios
+        total_needed = sum(needed_resources.values())
+        
+        # Asignar recursos con el enfoque de la versión original exitosa
+        if total_needed <= max_resources:
+            # Tenemos suficientes recursos para lo necesario
+            resources = needed_resources.copy()
+            remaining = max_resources - total_needed
+            
+            # Distribuir extras con énfasis en trajes y munición - VERSIÓN ORIGINAL
+            if remaining > 0:
+                # División: 45% trajes, 45% munición, 10% explosivos
+                extra_suits = int(remaining * 0.45)
+                extra_ammo = int(remaining * 0.45)
+                extra_explosives = remaining - extra_suits - extra_ammo
+                
+                resources['radiation_suits'] += extra_suits
+                resources['ammo'] += extra_ammo
+                resources['explosives'] += extra_explosives
+        else:
+            # No tenemos suficientes recursos - VERSIÓN ORIGINAL
+            # Prioridad: trajes = munición > explosivos
+            resources = {'explosives': 0, 'ammo': 0, 'radiation_suits': 0}
+            remaining = max_resources
+            
+            # Asignar primero a trajes y munición equitativamente
+            suits_ammo_needed = needed_resources['radiation_suits'] + needed_resources['ammo']
+            if suits_ammo_needed > 0:
+                if suits_ammo_needed <= remaining:
+                    # Podemos cubrir ambos
+                    resources['radiation_suits'] = needed_resources['radiation_suits']
+                    resources['ammo'] = needed_resources['ammo']
+                    remaining -= suits_ammo_needed
+                else:
+                    # Distribuir proporcionalmente
+                    ratio = remaining / suits_ammo_needed
+                    resources['radiation_suits'] = max(1, int(needed_resources['radiation_suits'] * ratio))
+                    remaining -= resources['radiation_suits']
+                    resources['ammo'] = min(remaining, needed_resources['ammo'])
+                    remaining -= resources['ammo']
+            
+            # Si quedan recursos, asignar a explosivos
+            if remaining > 0 and needed_resources['explosives'] > 0:
+                resources['explosives'] = min(remaining, needed_resources['explosives'])
+        
+        # Asegurar que estamos usando todos los recursos disponibles
+        remaining = max_resources - sum(resources.values())
+        if remaining > 0:
+            # Dividir equitativamente entre trajes y munición como en la versión exitosa
+            resources['radiation_suits'] += remaining // 2
+            resources['ammo'] += remaining - (remaining // 2)
+        
+        return PolicyResult(safest_path, resources)
+    def _policy_4(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
+        """
+        Política inspirada en el enfoque proporcionado, que busca el camino con el menor número de problemas
+        y asigna recursos en función de los problemas encontrados.
+        """
+        # Definir los umbrales para los problemas
+        THERMAL_THRESHOLD = 0.2
+        RADIATION_THRESHOLD = 0.18
+        BLOCKAGE_THRESHOLD = 0.27
     
-    
-    
+        # Crear un grafo ponderado
+        weighted_graph = city.graph.copy()
+
+        # Asignar pesos a los nodos basados en problemas
+        for node in weighted_graph.nodes():
+            node_key = node  # Usar el nodo directamente (asumiendo que las claves son enteros)
+            node_data = proxy_data.node_data.get(node_key, {})
+            
+            # Contar problemas en el nodo (uno por tipo)
+            thermal_problem = 1 if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD else 0
+            radiation_problem = 1 if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD else 0
+            
+            # Peso del nodo: suma de problemas
+            weighted_graph.nodes[node]["weight"] = thermal_problem + radiation_problem
+
+        # Asignar pesos a las aristas basados en problemas
+        for u, v in weighted_graph.edges():
+            edge = tuple(sorted([u, v]))  # Normalizar la clave de la arista
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= BLOCKAGE_THRESHOLD
+        
+            
+            # Peso de la arista: 1 si tiene algún problema, 0 si no
+            weighted_graph[u][v]["weight"] = 1 if (has_blockage) else 0
+
+        # Encontrar el camino con el menor peso total usando Dijkstra
+        best_path = None
+        min_weight = float('inf')
+
+        for target in city.extraction_nodes:
+            try:
+                # Usar Dijkstra para encontrar el camino más corto en términos de peso
+                path = nx.dijkstra_path(weighted_graph, city.starting_node, target, weight="weight")
+                path_weight = nx.path_weight(weighted_graph, path, weight="weight")
+                
+                if path_weight < min_weight:
+                    min_weight = path_weight
+                    best_path = path
+            except nx.NetworkXNoPath:
+                continue
+
+        # Si no encontramos ningún camino, nos quedamos en el nodo inicial
+        if best_path is None:
+            best_path = [city.starting_node]
+
+        # Contar problemas en el mejor camino
+        thermal_problems = 0
+        radiation_problems = 0
+        explosives_problems = 0  # Incluye problemas sísmicos, de bloqueo y de daño estructural
+
+        # Contar problemas en nodos (excluyendo el último nodo)
+        for node in best_path[:-1]:  # Excluir el último nodo
+            node_key = node
+            node_data = proxy_data.node_data.get(node_key, {})
+            
+            # Contar problemas en el nodo (uno por tipo)
+            if node_data.get("thermal_readings", 0) >= THERMAL_THRESHOLD:
+                thermal_problems += 1  # Problema térmico (ammo)
+            if node_data.get("radiation_readings", 0) >= RADIATION_THRESHOLD:
+                radiation_problems += 1  # Problema de radiación (radiation_suits)
+
+        # Contar problemas en aristas (excluyendo la última arista)
+        for i in range(len(best_path) - 2):  # Excluir la última arista
+            u = best_path[i]
+            v = best_path[i + 1]
+            edge = tuple(sorted([u, v]))
+            edge_data = proxy_data.edge_data.get(edge, {})
+            
+            # Determinar si la arista tiene algún problema (solo uno por arista)
+            has_blockage = edge_data.get("debris_density", 0) >= BLOCKAGE_THRESHOLD
+            
+            if has_blockage:
+                explosives_problems += 1  # Problema de bloqueo o daño estructural (explosives)
+
+        # Asignar recursos en función de los problemas
+        resources = {
+            'radiation_suits': radiation_problems,  # 1 por problema de radiación
+            'ammo': thermal_problems,               # 1 por problema de thermal
+            'explosives': explosives_problems       # 1 por problema sísmico, de bloqueo o de daño estructural
+        }
+        
+        # Calcular el total de recursos asignados
+        total_assigned = sum(resources.values())
+
+        # Si sobran recursos, distribuirlos equitativamente
+        remaining_resources = max_resources - total_assigned
+        if remaining_resources > 0:
+            resources['radiation_suits'] += remaining_resources // 3
+            resources['ammo'] += remaining_resources // 3
+            resources['explosives'] += remaining_resources // 3
+
+            # Asignar el resto si no es divisible exactamente
+            remainder = remaining_resources % 3
+            if remainder >= 1:
+                resources['radiation_suits'] += 1
+            if remainder >= 2:
+                resources['ammo'] += 1
+
+        return PolicyResult(best_path, resources)
