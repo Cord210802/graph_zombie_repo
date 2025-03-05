@@ -1,0 +1,91 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-05T12:33:53.089555",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            10,
+            12,
+            18
+        ],
+        "resources_allocated": {
+            "explosives": 2,
+            "ammo": 2,
+            "radiation_suits": 1
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 65.99364774719108,
+        "path_length": 42.79052434744479,
+        "resources": {
+            "initial": {
+                "explosives": 2,
+                "ammo": 2,
+                "radiation_suits": 1
+            },
+            "remaining": {
+                "explosives": 1,
+                "ammo": 2,
+                "radiation_suits": 1
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 10"
+            ],
+            [
+                1,
+                "Arrived at node 10"
+            ],
+            [
+                1,
+                "Path blocked to node 18 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 18"
+            ],
+            [
+                2,
+                "Arrived at node 12"
+            ],
+            [
+                3,
+                "Arrived at node 18"
+            ],
+            [
+                3,
+                "Successfully reached extraction point at node 18"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 2,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 2,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "radiation_suits": {
+                "allocated": 1,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

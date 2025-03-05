@@ -1,0 +1,116 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-05T12:35:02.068675",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            0,
+            8,
+            2,
+            16
+        ],
+        "resources_allocated": {
+            "radiation_suits": 3,
+            "ammo": 3,
+            "explosives": 3
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 160.74852734386283,
+        "path_length": 63.22377826421346,
+        "resources": {
+            "initial": {
+                "radiation_suits": 3,
+                "ammo": 3,
+                "explosives": 3
+            },
+            "remaining": {
+                "radiation_suits": 3,
+                "ammo": 1,
+                "explosives": 2
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 0"
+            ],
+            [
+                1,
+                "Arrived at node 0"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.74)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                1,
+                "Path blocked to node 2 (blockage detected)"
+            ],
+            [
+                1,
+                "Used explosives successfully to clear path"
+            ],
+            [
+                1,
+                "Moving to node 2"
+            ],
+            [
+                2,
+                "Arrived at node 8"
+            ],
+            [
+                2,
+                "Moving to node 16"
+            ],
+            [
+                3,
+                "Arrived at node 2"
+            ],
+            [
+                3,
+                "Zombie horde encountered (level: 0.59)"
+            ],
+            [
+                3,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                4,
+                "Arrived at node 16"
+            ],
+            [
+                4,
+                "Successfully reached extraction point at node 16"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "ammo": {
+                "allocated": 3,
+                "used": 2,
+                "needed": 2,
+                "effective_uses": 2
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

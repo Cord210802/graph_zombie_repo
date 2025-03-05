@@ -1,0 +1,74 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-05T12:36:06.964818",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            35,
+            11,
+            30,
+            17,
+            26,
+            32,
+            3,
+            4,
+            9,
+            6
+        ],
+        "resources_allocated": {
+            "radiation_suits": 5,
+            "ammo": 9,
+            "explosives": 3
+        }
+    },
+    "outcome": {
+        "success": false,
+        "time_taken": 140.99684497967715,
+        "path_length": 139.83432232101433,
+        "resources": {
+            "initial": {
+                "radiation_suits": 5,
+                "ammo": 9,
+                "explosives": 3
+            },
+            "remaining": {
+                "radiation_suits": 0,
+                "ammo": 0,
+                "explosives": 0
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 35"
+            ],
+            [
+                1,
+                "Mission Failed, you exceeded the amout of allowed resources and your team was killed by the population due to their greed."
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 3,
+                "used": 3,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "ammo": {
+                "allocated": 9,
+                "used": 9,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "radiation_suits": {
+                "allocated": 5,
+                "used": 5,
+                "needed": 0,
+                "effective_uses": 0
+            }
+        }
+    }
+}

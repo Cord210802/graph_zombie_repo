@@ -1,0 +1,90 @@
+{
+    "metadata": {
+        "timestamp": "2025-03-05T12:36:07.467675",
+        "solution_class": "EvacuationPolicy"
+    },
+    "plan": {
+        "path": [
+            12,
+            33
+        ],
+        "resources_allocated": {
+            "radiation_suits": 3,
+            "ammo": 2,
+            "explosives": 2
+        }
+    },
+    "outcome": {
+        "success": true,
+        "time_taken": 25.637833902028724,
+        "path_length": 11.705340406133633,
+        "resources": {
+            "initial": {
+                "radiation_suits": 3,
+                "ammo": 2,
+                "explosives": 2
+            },
+            "remaining": {
+                "radiation_suits": 2,
+                "ammo": 1,
+                "explosives": 2
+            }
+        }
+    },
+    "events": {
+        "chronological": [
+            [
+                0,
+                "Mission started at node 12"
+            ],
+            [
+                1,
+                "Arrived at node 12"
+            ],
+            [
+                1,
+                "High radiation detected (level: 0.35)"
+            ],
+            [
+                1,
+                "Used radiation suit successfully"
+            ],
+            [
+                1,
+                "Zombie horde encountered (level: 0.55)"
+            ],
+            [
+                1,
+                "Used ammo successfully against zombies"
+            ],
+            [
+                2,
+                "Arrived at node 33"
+            ],
+            [
+                2,
+                "Successfully reached extraction point at node 33"
+            ]
+        ],
+        "resource_summary": {
+            "explosives": {
+                "allocated": 2,
+                "used": 0,
+                "needed": 0,
+                "effective_uses": 0
+            },
+            "ammo": {
+                "allocated": 2,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            },
+            "radiation_suits": {
+                "allocated": 3,
+                "used": 1,
+                "needed": 1,
+                "effective_uses": 1
+            }
+        }
+    }
+}
