@@ -122,6 +122,7 @@ class EvacuationPolicy:
                 resources[resource_types[i]] += 1
         
         return PolicyResult(best_path, resources)
+    
     def _policy_2(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política que minimiza el hazard_gradient a lo largo de la ruta.
@@ -130,7 +131,7 @@ class EvacuationPolicy:
         Esta política:
         - Verifica la conectividad del grafo
         - Se enfoca en minimizar el hazard_gradient
-        - Distribuye recursos según la prioridad establecida
+        - Distribuye recursos equitativamente entre todos los tipos
         """
         # Verificamos si es posible llegar a alguno de los puntos de extracción
         reachable_targets = []
@@ -163,7 +164,7 @@ class EvacuationPolicy:
                 hazard_value = proxy_data.edge_data[edge_key].get("hazard_gradient", 0)
                 
                 # Añadimos un pequeño valor constante para evitar pesos de cero
-                new_weight = base_weight * (1 + hazard_value * 10 + 0.01)
+                new_weight = base_weight * (1 + hazard_value * 10)
                 hazard_graph[u][v]['weight'] = new_weight
         
         # Encontramos el camino más corto (con menor hazard_gradient acumulado)
@@ -178,23 +179,26 @@ class EvacuationPolicy:
                 best_path = path
                 best_path_cost = path_cost
         
-        # Distribuimos recursos según la prioridad establecida
-        # Trajes de radiación (45%), munición (35%), explosivos (20%)
+        # Distribuir los recursos de manera equitativa (33% cada uno)
+        resources_per_type = max_resources // 3
+        
+        # Manejar casos donde max_resources no es divisible por 3
+        remaining = max_resources - (resources_per_type * 3)
+        
         resources = {
-            'radiation_suits': int(max_resources * 0.45),
-            'ammo': int(max_resources * 0.35),
-            'explosives': max_resources - int(max_resources * 0.45) - int(max_resources * 0.35)
+            'explosives': resources_per_type,
+            'ammo': resources_per_type,
+            'radiation_suits': resources_per_type
         }
         
-        
-        # Ajustamos para asegurar que sumamos exactamente max_resources
-        adjustment = max_resources - sum(resources.values())
-        
-        # Si hay ajuste necesario, lo asignamos prioritariamente a trajes de radiación
-        if adjustment > 0:
-            resources['radiation_suits'] += adjustment
+        # Distribuir los recursos restantes (si hay) de manera secuencial
+        if remaining > 0:
+            resource_types = ['explosives', 'ammo', 'radiation_suits']
+            for i in range(remaining):
+                resources[resource_types[i]] += 1
         
         return PolicyResult(best_path, resources)
+    
     def _policy_3(self, city: CityGraph, proxy_data: ProxyData, max_resources: int) -> PolicyResult:
         """
         Política 3: Estrategia usando datos de simulaciones previas.
